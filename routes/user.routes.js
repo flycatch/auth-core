@@ -38,6 +38,17 @@ router.post("/login/passport", (req, res, next) => {
   })(req, res, next);
 });
 
+// google login ()
+router.get('/auth/google',
+    passport.authenticate('google', { scope: ['profile'] }));
+  
+  router.get('/auth/google/callback', 
+    passport.authenticate('google', { failureRedirect: '/login/failure' }),
+    function(req, res) {
+      // Successful authentication, redirect home.
+      res.send({message: 'successfully login through google auth'});
+    });
+
 // Protected route for session-based auth (GET /dashboard/session)
 router.get("/dashboard/session", isAuthenticated, (req, res) => {
     logger.info(`User ${req.user.username} accessed session-protected route with Session ID: ${req.sessionID}`);
