@@ -11,6 +11,11 @@ const users = [
     id: 2,
     username: 'jane',
     password: bcrypt.hashSync('password456', 10),
+  },
+  {
+    googleId: 3,
+    username: 'ansad k',
+    password: bcrypt.hashSync('password456', 10),
   }
 ];
 

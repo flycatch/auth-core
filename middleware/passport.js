@@ -3,9 +3,9 @@ const LocalStrategy = require('passport-local').Strategy;
 const JwtStrategy = require('passport-jwt').Strategy;
 const ExtractJwt = require('passport-jwt').ExtractJwt;
 const bcrypt = require('bcryptjs');
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const users = require('../mock-data/users');
 const { jwtSecret } = require('../utils');
-
 // Session-based strategy
 passport.use('local', new LocalStrategy((username, password, done) => {
   const user = users.find(u => u.username === username);
@@ -37,10 +37,6 @@ passport.use(new JwtStrategy(jwtOptions, (jwtPayload, done) => {
   }
 }));
 
-// Serialize user (for session-based)
-passport.serializeUser((user, done) => {
-  done(null, user.id);
-});
 
 passport.deserializeUser((id, done) => {
   const user = users.find(u => u.id === id);
