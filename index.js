@@ -5,12 +5,14 @@ const bodyParser = require('body-parser');
 const logger = require('./libs/wintson-logger');
 const routes = require('./routes/user.routes');
 require('./middleware/passport'); // Load passport strategies
+const loggerMiddleWare = require('./middleware/logging-middleware');
 
 const app = express();
 
 // Middleware
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
+app.use(loggerMiddleWare);
 
 // Express session middleware for session-based auth
 app.use(session({
