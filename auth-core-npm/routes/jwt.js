@@ -4,6 +4,36 @@ const logger = require('../lib/wintson.logger');
 module.exports = (router, config) => {
     const prefix = config.jwt.prefix || '/auth/jwt';
 
+   const  createAccessToken = async (user) => {
+        const payload = {
+            id: user.id,
+            username: user.username,
+            type: 'access'
+        }
+
+        const accessToken = jwt.sign(
+            payload,
+            config.jwt.secret,
+            { expiresIn: config.jwt.jwt_expires || '8h' }
+        );
+        return accessToken; 
+    }
+
+   const createRefreshToken = async (user) => {
+        const payload = {
+            id: user.id,
+            username: user.username,
+            type: 'refresh'
+        }
+
+        const refreshToken = jwt.sign(
+            payload,
+            config.jwt.secret,
+            { expiresIn: config.jwt.jwt_expires || '7d' }
+        );
+        return refreshToken;
+    }
+
     // Login Route
     router.post(`${prefix}/login`, async (req, res) => {
         const { username, password } = req.body;
@@ -22,20 +52,8 @@ module.exports = (router, config) => {
                 return res.status(401).json({ error: 'Invalid username or password' });
             }
 
-            const payload = {
-                id: user.id,
-                username: user.username
-            }
-
-            const accessToken = jwt.sign(
-                payload,
-                config.jwt.secret,
-                { expiresIn: config.jwt.jwt_expires || '8h' }
-            );
-            const refreshToken = config.jwt.refresh
-                ? jwt.sign({ username: user.username }, config.jwt.secret, { expiresIn: '7d' })
-                : null;
-
+            const accessToken = await createAccessToken(user);
+            const refreshToken = await createRefreshToken(user);
             logger.info(`Login successful for username: ${username}`);
             res.json({ accessToken, refreshToken });
         } catch (error) {
@@ -46,7 +64,7 @@ module.exports = (router, config) => {
 
     // Refresh Token Route
     if (config.jwt.refresh) { 
-        router.post(`${prefix}/refresh`, (req, res) => {
+        router.post(`${prefix}/refresh`,async (req, res) => {
             const { refreshToken } = req.body;
 
             logger.info(`Refresh token attempt received`);
@@ -56,20 +74,22 @@ module.exports = (router, config) => {
             }
 
             try {
-                jwt.verify(refreshToken, config.jwt.secret, (err, user) => {
+                jwt.verify(refreshToken, config.jwt.secret, async (err, user) => {
                     if (err) {
                         logger.warn('Invalid refresh token provided', { error: err.message });
                         return res.status(403).json({ error: 'Invalid refresh token' });
                     }
+                   
 
-                    const accessToken = jwt.sign(
-                        { username: user.username },
-                        config.jwt.secret,
-                        { expiresIn: config.jwt.jwt_expires ||'8h' }
-                    );
+                    if (user.type !== 'refresh') {
+                        logger.warn('Invalid token type for refresh');
+                        return res.status(403).json({ error: 'Invalid token type' });
+                    }
+                    const accessToken = await createAccessToken(user);
+                    const refreshToken = await createRefreshToken(user);
 
                     logger.info(`Access token refreshed for username: ${user.username}`);
-                    res.json({ accessToken });
+                    res.json({ accessToken, refreshToken });
                 });
             } catch (error) {
                 logger.error('JWT Refresh Error', { error });
