@@ -1,0 +1,55 @@
+// AuthCore.d.ts
+
+import { Router } from "express";
+
+interface SessionConfig {
+    secret?: string;
+    resave?: boolean;
+    saveUninitialized?: boolean;
+    cookie?: {
+        secure?: boolean;
+        maxAge?: number;
+    };
+}
+
+interface JwtConfig {
+    enabled: boolean;
+    secret: string;
+    expiresIn?: string;
+    refreshToken?: boolean;
+    prefix?: string;
+}
+
+interface GoogleConfig {
+    enabled: boolean;
+    clientID: string;
+    clientSecret: string;
+    callbackURL: string;
+    secret: string;
+}
+
+interface Config {
+    jwt?: JwtConfig;
+    session?: SessionConfig;
+    google?: GoogleConfig;
+    user_service: {
+        load_user: (email: string) => Promise<any>; 
+    };
+}
+
+declare class AuthCore {
+    private configurations: Config;
+    public router: Router;
+
+    constructor();
+
+    config(config: Config): Router;
+
+    private setupSession(config: Config): void;
+
+    private setupGoogleOath(config: Config): void;
+
+    public verify(): (req: any, res: any, next: any) => void;
+}
+
+export default AuthCore;
