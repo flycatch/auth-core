@@ -35,6 +35,7 @@ interface Config {
     user_service: {
         load_user: (email: string) => Promise<any>; 
     };
+    password_checker: (inputPassword: string, storedPassword: string) => Promise<boolean>; // Added password_checker
 }
 
 declare class AuthCore {
