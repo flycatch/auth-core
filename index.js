@@ -1,34 +1,75 @@
-const express = require('express');
-const session = require('express-session');
-const passport = require('passport');
-const bodyParser = require('body-parser');
-const logger = require('./libs/wintson-logger');
-const routes = require('./routes/user.routes');
-require('./middleware/passport'); // Load passport strategies
-const loggerMiddleWare = require('./middleware/logging-middleware');
+const express = require("express");
+const bodyParser = require("body-parser");
+const bcrypt = require("bcryptjs");
+const auth = require("./auth-core-npm/index");
+require("dotenv").config();
 
 const app = express();
-
-// Middleware
-app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
-app.use(loggerMiddleWare);
+app.use(bodyParser.urlencoded({ extended: false }));
 
-// Express session middleware for session-based auth
-app.use(session({
-  secret: 'session-secret-key',
-  resave: false,
-  saveUninitialized: false,
-}));
+// Mock User Repository
+const userRepository = {
+  // Store mock users in an array
+  users: [
+    {
+      id: '123',
+      username: "exampleUser",
+      password: bcrypt.hashSync("password123", 10), // Hash the password synchronously
+    },
+    
+  ],
 
-// Initialize Passport and session handling
-app.use(passport.initialize());
-app.use(passport.session()); // For session-based auth
+  // Find user by username
+  async find(username) {
+    return this.users.find((user) => user.username === username) || null;
+  },
+};
 
-// Setup routes
-app.use('/', routes);
+app.use(
+  // Configure auth-core
+  auth.config({
+    jwt: {
+      enabled: true,
+      refresh: true,
+      jwt_expires: "8h",
+      secret: "jwt-secret",
+      prefix: "/auth/jwt",
+    },
+    session: {
+      enabled: false,
+      secret: "session-secret",
+      prefix: "/auth/session",
+      resave: false,
+      saveUninitialized: true,
+      cookie: {
+        secure: false,
+        maxAge: 24 * 60 * 60 * 1000, // 1 day
+      },
+    },
+    google: {
+      enabled: false,
+      clientID: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      callbackURL: '/auth/google/callback',
+      secret: 'secret',
+    },
+    password_checker: async (inputPassword, storedPassword) => {
+      return await bcrypt.compare(inputPassword, storedPassword);
+    },
+    user_service: {
+      load_user: async (username) => {
+        return await userRepository.find(username);
+      },
+    },
+  })
+);
 
-const port = 3003;
-app.listen(port, () => {
-    logger.info(`Server is running on http://localhost:${port}`);
+// Protected User Route
+app.get("/user", auth.verify(), (req, res) => {
+  res.json({ message: "Access granted", user: req.user });
+});
+
+app.listen(3004, () => {
+  console.log("Server running on http://localhost:3004");
 });
