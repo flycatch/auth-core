@@ -1,6 +1,6 @@
-# AuthCore: Unified Authentication Middleware for Express.js
+# AuthCore: Unified Authentication Middleware for Express.js and Nest.js
 
-AuthCore is a lightweight authentication middleware designed to streamline the process of implementing JWT, session-based, and Google OAuth2 authentication in your Express.js applications. With AuthCore, you can easily integrate and manage multiple authentication strategies through a single, unified configuration.
+AuthCore is a lightweight authentication middleware designed to streamline the process of implementing JWT, session-based, and Google OAuth2 authentication in your Express.js and Nest.js applications. With AuthCore, you can easily integrate and manage multiple authentication strategies through a single, unified configuration.
 
 ## Features
 
@@ -37,7 +37,7 @@ app.use(
       enabled: true,
       secret: "jwt-secret",
       expiresIn: "8h",
-      refreshToken: true,
+      refresh: true,
       prefix: "/auth/jwt",
     },
     session: {
@@ -150,6 +150,109 @@ Initializes AuthCore with the provided configuration. Returns an Express router 
 
 Middleware to verify user authentication based on the enabled strategy (JWT, session, or Google OAuth).
 
+Here’s a quick example of how to use AuthCore in an Nest.js application.
+
+## Import the Library
+
+Install the required dependencies if not already installed:
+
+### npm install @nestjs/passport passportjs
+
+## Authentication Guard
+
+Create a custom guard to use auth.verify() in your NestJS application:
+
+#### authguard.ts file
+
+```javascript
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  UnauthorizedException,
+} from '@nestjs/common';
+import authCore from 'passportjs'; // Import your auth library
+
+@Injectable()
+export class AuthGuard implements CanActivate {
+  canActivate(context: ExecutionContext): Promise<boolean> {
+    const req = context.switchToHttp().getRequest();
+    const res = context.switchToHttp().getResponse();
+
+    return new Promise((resolve, reject) => {
+      const next = (err?: any) => {
+        if (err) {
+          return reject(
+            new UnauthorizedException(err.message || 'Unauthorized'),
+          );
+        }
+        resolve(true); // Authentication passed
+      };
+
+      try {
+        const verifyMiddleware = authCore.verify(); // Use the verify middleware
+        verifyMiddleware(req, res, next);
+      } catch (error: any) {
+        reject(new UnauthorizedException('Authentication error'));
+      }
+    });
+  }
+}
+```
+
+### Controller Configuration
+
+Use the custom guard to protect your routes:
+
+### app.controller.ts
+
+```javascript
+import { Controller, Get, Request, UseGuards } from "@nestjs/common";
+import { AuthGuard } from "./authguard/authguard.guard";
+
+@Controller("user")
+export class AppController {
+  @Get("/")
+  @UseGuards(AuthGuard)
+  async getUser(@Request() req: any) {
+    return { message: "Verification successful", user: req.user };
+  }
+}
+```
+
+### Initialize Authentication in main.ts
+
+### main.ts
+
+```javascript
+import { NestFactory } from "@nestjs/core";
+import { AppModule } from "./app.module";
+import auth from "passportjs"; // Import the library
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+
+  // Configure the authentication
+  auth.config({
+    jwt: {
+      enabled: true,
+      refresh: true,
+      config: { secret: "your_jwt_secret" },
+    },
+    session: { enabled: true },
+    google: {
+      enabled: true,
+      clientID: "your_client_id",
+      clientSecret: "your_client_secret",
+      callbackURL: "http://localhost:3000/auth/google/callback",
+    },
+  });
+
+  await app.listen(3000);
+}
+bootstrap();
+```
+
 ## Contributing
 
 Contributions are welcome! Please fork the repository and submit a pull request with your improvements.
@@ -161,3 +264,7 @@ This project is licensed under the MIT License.
 ---
 
 For more details and advanced use cases, visit the [GitHub repository](#) or contact the project maintainers.
+
+```
+
+```
