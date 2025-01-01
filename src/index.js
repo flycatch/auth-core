@@ -28,7 +28,6 @@ class AuthCore {
     }
     // Automatically set up routes if google is enabled
     if (config.google && config.google.enabled) {
-      console.log('google......');
       this.setupGoogleOath( config);
       setupGoogleRoutes(this.router, config);
 
@@ -55,7 +54,6 @@ class AuthCore {
 
 
 setupGoogleOath(config) {
-  console.log('passport google init');
   passport.use(
     new GoogleStrategy(
       {
