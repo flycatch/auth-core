@@ -21,11 +21,14 @@ class AuthCore {
     if (config.jwt && config.jwt.enabled) {
       jwtRoutes(this.router, config);
     }
+    // Automatically set up routes if session is enabled
     if (config.session && config.session.enabled) {
       this.setupSession(config);
       sessionRoutes(this.router, config);
     }
+    // Automatically set up routes if google is enabled
     if (config.google && config.google.enabled) {
+      console.log('google......');
       this.setupGoogleOath( config);
       setupGoogleRoutes(this.router, config);
 
@@ -52,6 +55,7 @@ class AuthCore {
 
 
 setupGoogleOath(config) {
+  console.log('passport google init');
   passport.use(
     new GoogleStrategy(
       {
@@ -196,5 +200,14 @@ verify() {
   }
   
 }
+const auth = new AuthCore();
+// module.exports.default = auth; // Add a default export
+// // export default new AuthCore();
 
-module.exports = new AuthCore();
+// // module.exports = new AuthCore();
+
+
+
+module.exports = auth;
+module.exports.AuthCore = AuthCore; // Add class for NestJS DI compatibility
+module.exports.default = auth;
