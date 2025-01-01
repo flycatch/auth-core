@@ -1,5 +1,5 @@
 {
-  "name": "passportjs",
+  "name": "auth-core",
   "version": "1.0.0",
   "description": "A unified authentication module for Express.js, NestJS frameworks, supporting JWT, session-based, and Google OAuth login.",
   "main": "src/index.js",
