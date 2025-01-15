@@ -6,11 +6,11 @@
   "types": "src/index.d.ts",
   "repository": {
     "type": "git",
-    "url": "git+//https://github.com/flycatch/auth-core.git"
+    "url": "git+https://github.com/flycatch/auth-core.git"
   },
   "scripts": {},
   "author": "flycatch",
-  "license": "ISC",
+  "license": "",
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "body-parser": "^1.20.3",
