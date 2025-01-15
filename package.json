@@ -1,13 +1,15 @@
 {
-  "name": "auth-core",
+  "name": "@flycatch/auth-core",
   "version": "1.0.0",
   "description": "A unified authentication module for Express.js, NestJS frameworks, supporting JWT, session-based, and Google OAuth login.",
   "main": "src/index.js",
   "types": "src/index.d.ts",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+  "repository": {
+    "type": "git",
+    "url": "git+//https://github.com/flycatch/auth-core.git"
   },
-  "author": "",
+  "scripts": {},
+  "author": "flycatch",
   "license": "ISC",
   "dependencies": {
     "bcryptjs": "^2.4.3",
