@@ -1,1 +1,3 @@
 application.log
+node_modules/
+.npmrc
