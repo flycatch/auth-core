@@ -13,7 +13,7 @@ AuthCore is a lightweight authentication middleware designed to streamline the p
 ## Installation
 
 ```bash
-npm install auth-core
+npm install @flycatch/auth-core
 ```
 
 ## Getting Started
@@ -24,7 +24,7 @@ Here’s a quick example of how to use AuthCore in an Express.js application.
 
 ```javascript
 const express = require("express");
-const AuthCore = require("auth-core");
+const AuthCore = require("@flycatch/auth-core");
 const bcrypt = require("bcrypt");
 
 const app = express();
@@ -156,7 +156,7 @@ Contributions are welcome! Please fork the repository and submit a pull request 
 
 ## License
 
-This project is licensed under the MIT License.
+This project is licensed under the GPL-3.0 License.
 
 ---
 

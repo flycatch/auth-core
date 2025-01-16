@@ -1,106 +1,3 @@
-<!-- Here’s a quick example of how to use AuthCore in an Nest.js application.
-
-## Import the Library
-
-Install the required dependencies if not already installed:
-
-### npm install @nestjs/passport passportjs
-
-## Authentication Guard
-
-Create a custom guard to use auth.verify() in your NestJS application:
-
-#### authguard.ts file
-
-```javascript
-import {
-  Injectable,
-  CanActivate,
-  ExecutionContext,
-  UnauthorizedException,
-} from '@nestjs/common';
-import authCore from 'passportjs'; // Import your auth library
-
-@Injectable()
-export class AuthGuard implements CanActivate {
-  canActivate(context: ExecutionContext): Promise<boolean> {
-    const req = context.switchToHttp().getRequest();
-    const res = context.switchToHttp().getResponse();
-
-    return new Promise((resolve, reject) => {
-      const next = (err?: any) => {
-        if (err) {
-          return reject(
-            new UnauthorizedException(err.message || 'Unauthorized'),
-          );
-        }
-        resolve(true); // Authentication passed
-      };
-
-      try {
-        const verifyMiddleware = authCore.verify(); // Use the verify middleware
-        verifyMiddleware(req, res, next);
-      } catch (error: any) {
-        reject(new UnauthorizedException('Authentication error'));
-      }
-    });
-  }
-}
-```
-
-### Controller Configuration
-
-Use the custom guard to protect your routes:
-
-### app.controller.ts
-
-```javascript
-import { Controller, Get, Request, UseGuards } from "@nestjs/common";
-import { AuthGuard } from "./authguard/authguard.guard";
-
-@Controller("user")
-export class AppController {
-  @Get("/")
-  @UseGuards(AuthGuard)
-  async getUser(@Request() req: any) {
-    return { message: "Verification successful", user: req.user };
-  }
-}
-```
-
-### Initialize Authentication in main.ts
-
-### main.ts
-
-```javascript
-import { NestFactory } from "@nestjs/core";
-import { AppModule } from "./app.module";
-import auth from "passportjs"; // Import the library
-
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-
-  // Configure the authentication
-  auth.config({
-    jwt: {
-      enabled: true,
-      refresh: true,
-      config: { secret: "your_jwt_secret" },
-    },
-    session: { enabled: true },
-    google: {
-      enabled: true,
-      clientID: "your_client_id",
-      clientSecret: "your_client_secret",
-      callbackURL: "http://localhost:3000/auth/google/callback",
-    },
-  });
-
-  await app.listen(3000);
-}
-bootstrap();
-``` -->
-
 # PassportJS Authentication Library
 
 A unified authentication solution for **Express.js** and **NestJS** applications. This library supports **JWT**, **Session-based Authentication**, and **Google OAuth**, providing a seamless integration for both frameworks.
@@ -122,7 +19,7 @@ A unified authentication solution for **Express.js** and **NestJS** applications
 Install the library via npm:
 
 ```bash
-npm install auth-core
+npm install @flycatch/auth-core
 ```
 
 ---
@@ -148,7 +45,7 @@ import {
   ExecutionContext,
   UnauthorizedException,
 } from "@nestjs/common";
-import authCore from "auth-core"; // Import the library
+import authCore from "@flycatch/auth-core"; // Import the library
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -280,4 +177,4 @@ Contributions are welcome! Fork the repository and create a PR with your changes
 
 ## License
 
-MIT License. See the `LICENSE` file for details.
+GPL-3.0 License. See the `LICENSE` file for details.
