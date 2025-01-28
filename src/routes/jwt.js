@@ -13,7 +13,7 @@ module.exports = (router, config) => {
       type: "access",
     };
 
-    const accessToken = jwt.sign(payload, config.jwt.secret, {
+    const accessToken = jwt.sign(payload, config.jwt.secret || 'jwt_secret@auth', {
       expiresIn: config.jwt.jwt_expires || "8h",
     });
     return accessToken;
@@ -26,7 +26,7 @@ module.exports = (router, config) => {
       type: "refresh",
     };
 
-    const refreshToken = jwt.sign(payload, config.jwt.secret, {
+    const refreshToken = jwt.sign(payload, config.jwt.secret || 'jwt_secret@auth', {
       expiresIn: "7d",
     });
     return refreshToken;
@@ -76,7 +76,7 @@ module.exports = (router, config) => {
       try {
         logger.info("JWT refreshtoken header found, verifying...");
         const refreshToken = authHeader.split(" ")[1];
-        jwt.verify(refreshToken, config.jwt.secret, async (err, user) => {
+        jwt.verify(refreshToken, config.jwt.secret || 'jwt_secret@auth', async (err, user) => {
           if (err) {
             logger.warn("Invalid refresh token provided", {
               error: err.message,

@@ -111,7 +111,7 @@ function verify() {
         logger.info("JWT header found, verifying...");
         const token = authHeader.split(" ")[1];
 
-        jsonWebToken.verify(token, jwt.secret, (err, user) => {
+        jsonWebToken.verify(token, jwt.secret || 'jwt_secret@auth', (err, user) => {
           if (err) {
             logger.warn("Invalid or expired token", { error: err.message });
             return res.status(403).json({ error: "Token is invalid or expired" });
@@ -135,7 +135,7 @@ function verify() {
         logger.info("JWT only, verifying...");
         const token = authHeader.split(" ")[1];
 
-        jsonWebToken.verify(token, jwt.secret, (err, user) => {
+        jsonWebToken.verify(token, jwt.secret || 'jwt_secret@auth', (err, user) => {
           if (err) {
             logger.warn("Invalid or expired token", { error: err.message });
             return res.status(403).json({ error: "Token is invalid or expired" });
