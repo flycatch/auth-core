@@ -27,7 +27,7 @@ module.exports = (router, config) => {
     };
 
     const refreshToken = jwt.sign(payload, config.jwt.secret, {
-      expiresIn: config.jwt.jwt_expires || "7d",
+      expiresIn: "7d",
     });
     return refreshToken;
   };
