@@ -9,7 +9,7 @@ module.exports = (router, config) => {
     router.post(`${prefix}/login`, async (req, res) => {
         const { username, password } = req.body;
 
-        logger.info(` session login attempt for username: ${username}`);
+        logger.info(` session login attempt `);
         try {
 
             const user = await config.user_service.load_user(username);
@@ -27,7 +27,7 @@ module.exports = (router, config) => {
             // Store user details in session
             req.session.user = { username: user.username };
            
-            logger.info(`session Login successfull for username: ${username}`);
+            logger.info(`session Login successfull `);
             res.json({message: 'Login Successfull'});
         }
         catch(error) {

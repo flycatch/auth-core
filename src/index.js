@@ -65,12 +65,9 @@ function setupGoogleOath(config) {
       async (accessToken, refreshToken, profile, done) => {
         try {
           logger.info("Google OAuth strategy triggered");
-          logger.debug(`Access Token: ${accessToken}`);
-          logger.debug(`Refresh Token: ${refreshToken}`);
-          logger.debug(`Google Profile: ${JSON.stringify(profile)}`);
 
           const email = profile.emails[0].value;
-          logger.info(`Processing Google OAuth for email: ${email}`);
+          logger.info(`Processing Google OAuth `);
 
           const user = await config.user_service.load_user(email);
           if (!user) {
@@ -78,7 +75,7 @@ function setupGoogleOath(config) {
             return done(null, false, { message: "User not authorized" });
           }
 
-          logger.info(`User successfully authenticated: ${user.username}`);
+          logger.info(`User successfully authenticated`);
           return done(null, user);
         } catch (err) {
           logger.error("Error in Google OAuth strategy", { error: err.message });
@@ -89,12 +86,12 @@ function setupGoogleOath(config) {
   );
 
   passport.serializeUser((user, done) => {
-    logger.info(`Serializing user: ${user.username}`);
+    logger.info(`Serializing user`);
     done(null, user);
   });
 
   passport.deserializeUser((user, done) => {
-    logger.info(`Deserializing user: ${user.username}`);
+    logger.info(`Deserializing user`);
     done(null, user);
   });
 }
@@ -108,7 +105,7 @@ function verify() {
       const authHeader = req.headers["authorization"];
 
       if (authHeader) {
-        logger.info("JWT header found, verifying...");
+        logger.info("JWT header found, verifying");
         const token = authHeader.split(" ")[1];
 
         jsonWebToken.verify(token, jwt.secret || 'jwt_secret@auth', (err, user) => {
@@ -117,12 +114,12 @@ function verify() {
             return res.status(403).json({ error: "Token is invalid or expired" });
           }
 
-          logger.info(`JWT verified successfully for username: ${user.username}`);
+          logger.info(`JWT verified successfully for username`);
           req.user = user;
           return next();
         });
       } else if (req.session && req.session.user) {
-        logger.info(`Session verified for username: ${req.session.user.username}`);
+        logger.info(`Session verified `);
         req.user = req.session.user;
         return next();
       } else {
@@ -132,7 +129,7 @@ function verify() {
     } else if (jwt && jwt.enabled) {
       const authHeader = req.headers["authorization"];
       if (authHeader) {
-        logger.info("JWT only, verifying...");
+        logger.info("JWT only, verifying");
         const token = authHeader.split(" ")[1];
 
         jsonWebToken.verify(token, jwt.secret || 'jwt_secret@auth', (err, user) => {
@@ -141,7 +138,7 @@ function verify() {
             return res.status(403).json({ error: "Token is invalid or expired" });
           }
 
-          logger.info(`JWT verified successfully for username: ${user.username}`);
+          logger.info(`JWT verified successfully for username`);
           req.user = user;
           return next();
         });
@@ -151,7 +148,7 @@ function verify() {
       }
     } else if (session && session.enabled) {
       if (req.session && req.session.user) {
-        logger.info(`Session verified for username: ${req.session.user.username}`);
+        logger.info(`Session verified for username`);
         req.user = req.session.user;
         return next();
       } else {
@@ -161,7 +158,7 @@ function verify() {
     } else if (google && google.enabled) {
       const authHeader = req.headers["authorization"];
       if (authHeader) {
-        logger.info("JWT header found in Google OAuth, verifying...");
+        logger.info("JWT header found in Google OAuth, verifying");
         const token = authHeader.split(" ")[1];
 
         jsonWebToken.verify(token, google.secret, (err, user) => {
@@ -170,7 +167,7 @@ function verify() {
             return res.status(403).json({ error: "Token is invalid or expired" });
           }
 
-          logger.info(`JWT verified successfully for Google OAuth username: ${user.username}`);
+          logger.info(`JWT verified successfully for Google OAuth`);
           req.user = user;
           next();
         });

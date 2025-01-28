@@ -36,7 +36,7 @@ module.exports = (router, config) => {
   router.post(`${prefix}/login`, async (req, res) => {
     const { username, password } = req.body;
 
-    logger.info(`Login attempt for username: ${username}`);
+    logger.info(`Login attempt `);
     try {
       const user = await config.user_service.load_user(username);
       if (!user) {
@@ -49,13 +49,13 @@ module.exports = (router, config) => {
         user.password
       );
       if (!isValidPassword) {
-        logger.warn(`Login failed: Incorrect password (username: ${username})`);
+        logger.warn(`Login failed: Incorrect password `);
         return res.status(401).json({ error: "Invalid username or password" });
       }
 
       const accessToken = await createAccessToken(user);
       const refreshToken = await createRefreshToken(user);
-      logger.info(`Login successful for username: ${username}`);
+      logger.info(`Login successful `);
       res.json({ accessToken, refreshToken });
     } catch (error) {
       logger.error(`JWT Login Error for username: ${username}`, { error });
@@ -91,7 +91,7 @@ module.exports = (router, config) => {
           const accessToken = await createAccessToken(user);
           const refreshToken = await createRefreshToken(user);
 
-          logger.info(`Access token refreshed for username: ${user.username}`);
+          logger.info(`Access token refreshed`);
           res.json({ accessToken, refreshToken });
         });
       } catch (error) {
