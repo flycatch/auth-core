@@ -11,6 +11,7 @@ module.exports = (router, config) => {
       id: user.id,
       username: user.username,
       type: "access",
+      ...(user.grands && user.grands.length > 0 && { grands: user.grands }) // Add only if user.grands exists and is not empty
     };
 
     const accessToken = jwt.sign(payload, config.jwt.secret || 'jwt_secret@auth', {
@@ -24,6 +25,7 @@ module.exports = (router, config) => {
       id: user.id,
       username: user.username,
       type: "refresh",
+      ...(user.grands && user.grands.length > 0 && { grands: user.grands }) // Add only if user.grands exists and is not empty
     };
 
     const refreshToken = jwt.sign(payload, config.jwt.secret || 'jwt_secret@auth', {

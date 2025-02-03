@@ -1,6 +1,6 @@
-import logger from "../lib/wintson.logger";
+const logger = require ("../lib/wintson.logger");
 
-export function sessionMiddleware(config) {
+module.exports =  (config) => {
     return function (req, res, next) {
         if (!config.session?.enabled) return next(); // Skip if session is not enabled
 

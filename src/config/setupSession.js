@@ -2,7 +2,7 @@ const session = require("express-session");
 
 
 // Function to set up session configuration
-export function setupSession(router, config) {
+module.exports = (router, config) => {
   const { secret, resave, saveUninitialized, cookie } = config.session;
 
   router.use(

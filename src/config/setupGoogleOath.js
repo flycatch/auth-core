@@ -2,7 +2,7 @@ const passport = require("passport");
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
 
 // Function to set up Google OAuth
-export function setupGoogleOath(config) {
+module.exports = (config) => {
     passport.use(
       new GoogleStrategy(
         {

@@ -7,11 +7,11 @@ const sessionRoutes = require("./routes/session");
 const passport = require("passport");
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
 const setupGoogleRoutes = require("./routes/setup-google-oath");
-const { setupSession } = require("./config/setupSession");
-const { setupGoogleOath } = require("./config/setupGoogleOath");
-const { jwtMiddleware } = require("./middlewares/jwtMiddleware");
-const { sessionMiddleware } = require("./middlewares/sessionMiddleware");
-const { googleAuthMiddleware } = require("./middlewares/googleAuthMiddleware");
+const  setupSession  = require("./config/setupSession");
+const  setupGoogleOath  = require("./config/setupGoogleOath");
+const  jwtMiddleware  = require("./middlewares/jwtMiddleware");
+const  sessionMiddleware  = require("./middlewares/sessionMiddleware");
+const  googleAuthMiddleware  = require("./middlewares/googleAuthMiddleware");
 
 // Configuration storage
 let configurations = {};
@@ -108,7 +108,7 @@ function verify() {
 
 
     if (jwt && jwt.enabled) {
-      return jwtMiddleware(config);
+      return jwtMiddleware(config)(req, res, next);
       // const authHeader = req.headers["authorization"];
       // if (authHeader) {
       //   logger.info("JWT identified, verifying");
@@ -129,7 +129,7 @@ function verify() {
       //   return res.status(401).json({ error: "Unauthorized" });
       // }
     } else if (session && session.enabled) {
-      return sessionMiddleware(config);
+      return sessionMiddleware(config)(req, res, next);
       // if (req.session && req.session.user) {
       //   logger.info(`Session verified for username`);
       //   req.user = req.session.user;
@@ -139,7 +139,7 @@ function verify() {
       //   return res.status(401).json({ error: "Unauthorized" });
       // }
     } else if (google && google.enabled) {
-      return googleAuthMiddleware(config);
+      return googleAuthMiddleware(config)(req, res, next);
       // const authHeader = req.headers["authorization"];
       // if (authHeader) {
       //   logger.info("JWT header found in Google OAuth, verifying");

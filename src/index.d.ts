@@ -39,13 +39,13 @@ interface Config {
 }
 
 // Function-based approach
-declare function auth(config: Config): Router;
+declare function config(config: Config): Router;
 declare function setupSession(config: Config, router: Router): void;
 declare function setupGoogleAuth(config: Config): void;
 declare function verify(): (req: any, res: any, next: any) => void;
 
 // Exporting individual functions
-export { auth, setupSession, setupGoogleAuth, verify };
+export { config, setupSession, setupGoogleAuth, verify };
 
 
 

@@ -1,7 +1,7 @@
-import jwt from "jsonwebtoken";
-import logger from "../lib/wintson.logger";
+const jwt = require("jsonwebtoken");
+const logger =  require( "../lib/wintson.logger");
 
-export function jwtMiddleware(config) {
+module.exports =  (config) => {
     return function (req, res, next) {
         if (!config.jwt?.enabled) return next(); // Skip if JWT is not enabled
 

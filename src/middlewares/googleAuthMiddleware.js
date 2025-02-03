@@ -1,9 +1,7 @@
-import jwt from "jsonwebtoken";
-import { Request, Response, NextFunction } from "express";
-import { Config } from "../index.d";
-import logger from "../logger";
+const jwt = require ( "jsonwebtoken");
+const logger = require ("../lib/wintson.logger");
 
-export function googleAuthMiddleware(config) {
+module.exports =  (config) => {
     return function (req, res, next) {
         if (!config.google?.enabled) return next(); // Skip if Google OAuth is not enabled
 
