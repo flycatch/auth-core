@@ -42,7 +42,7 @@ interface Config {
 declare function config(config: Config): Router;
 declare function setupSession(config: Config, router: Router): void;
 declare function setupGoogleAuth(config: Config): void;
-declare function verify(): (req: any, res: any, next: any) => void;
+declare function verify(permission?: string): (req: any, res: any, next: any) => void;
 
 // Exporting individual functions
 export { config, setupSession, setupGoogleAuth, verify };

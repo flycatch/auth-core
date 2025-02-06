@@ -1,5 +1,6 @@
 const passport = require("passport");
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
+const logger = require("../lib/wintson.logger")
 
 // Function to set up Google OAuth
 module.exports = (config) => {

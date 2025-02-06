@@ -23,9 +23,14 @@ module.exports = (router, config) => {
                 logger.warn(`Login failed: invalid password`);
                 res.status(401).json({ error: 'Invalid username or password'})
             }
-
+            const payload = {
+                id: user.id,
+                username: user.username,
+                type: "access",
+                ...(user.grands && user.grands.length > 0 && { grands: user.grands }) // Add only if user.grands exists and is not empty
+              };
             // Store user details in session
-            req.session.user = { username: user.username };
+            req.session.user = payload;
            
             logger.info(`session Login successfull `);
             res.json({message: 'Login Successfull'});

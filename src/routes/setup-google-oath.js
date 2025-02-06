@@ -16,6 +16,8 @@ module.exports = (router, config) => {
       id: user.id,
       username: user.username,
       type: "access",
+      ...(user.grands && user.grands.length > 0 && { grands: user.grands }) // Add only if user.grands exists and is not empty
+
     };
 
     const accessToken = jwt.sign(payload, config.jwt.secret, {
@@ -29,6 +31,7 @@ module.exports = (router, config) => {
       id: user.id,
       username: user.username,
       type: "refresh",
+      ...(user.grands && user.grands.length > 0 && { grands: user.grands }) // Add only if user.grands exists and is not empty
     };
 
     const refreshToken = jwt.sign(payload, config.jwt.secret, {
@@ -43,20 +46,10 @@ module.exports = (router, config) => {
     async (req, res) => {
       try {
         logger.info("Handling Google OAuth callback");
-        // // Create a JWT token after successful login
-        // const payload = {
-        //   id: req.user.id,
-        //   username: req.user.username,
-        //   type: "access"
-        //   // email: req.user.email,
-        // };
-        // const token = jwt.sign(payload, config.google.secret, {
-        //   expiresIn: "8h",
-        // });
 
         const accessToken = await createAccessToken(req.user);
         const refreshToken = await createRefreshToken(req.user);
-
+        console.log('callback fun', accessToken);
         // Send the token in the response
         res.json({
           message: "Google OAuth successful",

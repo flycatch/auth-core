@@ -13,7 +13,6 @@ module.exports = (router, config) => {
       type: "access",
       ...(user.grands && user.grands.length > 0 && { grands: user.grands }) // Add only if user.grands exists and is not empty
     };
-
     const accessToken = jwt.sign(payload, config.jwt.secret || 'jwt_secret@auth', {
       expiresIn: config.jwt.jwt_expires || "8h",
     });

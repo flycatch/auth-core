@@ -23,13 +23,13 @@ function config(config) {
 
   // Set up routes if JWT is enabled
   if (config.jwt && config.jwt.enabled) {
-    jwtRoutes(router, config);
+    jwtRoutes(router, configurations);
   }
 
   // Set up routes if session is enabled
   if (config.session && config.session.enabled) {
-    setupSession(router, config);
-    sessionRoutes(router, config);
+    setupSession(router, configurations);
+    sessionRoutes(router, configurations);
   }
 
   // Set up routes if Google OAuth is enabled
@@ -41,7 +41,7 @@ function config(config) {
   return router;
 }
 
-// // Function to set up session configuration
+ // Function to set up session configuration
 // function setupSession(router, config) {
 //   const { secret, resave, saveUninitialized, cookie } = config.session;
 
@@ -102,62 +102,50 @@ function config(config) {
 // }
 
 // Middleware function for verifying authentication
-function verify() {
+function verify(permission) {
   return (req, res, next) => {
     const { jwt, session, google } = configurations;
 
+    //  Ensure user has permissions
+    const checkPermission = (user) => {
+      if (permission && (!user.grands || !user.grands.includes(permission))) {
+        logger.warn(`Access denied: Missing required permission (${permission})`);
+        return res.status(403).json({ error: "Access denied: Missing required permission" });
+      }
+      return next();
+    };
+
 
     if (jwt && jwt.enabled) {
-      return jwtMiddleware(config)(req, res, next);
-      // const authHeader = req.headers["authorization"];
-      // if (authHeader) {
-      //   logger.info("JWT identified, verifying");
-      //   const token = authHeader.split(" ")[1];
+      return jwtMiddleware(configurations)(req, res,(err) => {
 
-      //   jsonWebToken.verify(token, jwt.secret || 'jwt_secret@auth', (err, user) => {
-      //     if (err) {
-      //       logger.warn("Invalid or expired token", { error: err.message });
-      //       return res.status(403).json({ error: "Token is invalid or expired" });
-      //     }
+        if (err) {
+          logger.warn("JWT verification failed", { error: err.message });
+          return res.status(403).json({ error: "Token is invalid or expired" });
+        }
+        checkPermission(req.user);
+      });
 
-      //     logger.info(`JWT verified successfully for username`);
-      //     req.user = user;
-      //     return next();
-      //   });
-      // } else {
-      //   logger.warn("Unauthorized access attempt");
-      //   return res.status(401).json({ error: "Unauthorized" });
-      // }
     } else if (session && session.enabled) {
-      return sessionMiddleware(config)(req, res, next);
-      // if (req.session && req.session.user) {
-      //   logger.info(`Session verified for username`);
-      //   req.user = req.session.user;
-      //   return next();
-      // } else {
-      //   logger.warn("Unauthorized access attempt");
-      //   return res.status(401).json({ error: "Unauthorized" });
-      // }
+      return sessionMiddleware(configurations)(req, res, (err) => {
+
+        if (err) {
+          logger.warn("Session verification failed", { error: err.message });
+          return res.status(403).json({ error: "Invalid session" });
+        }
+        checkPermission(req.user);
+
+      });
+     
     } else if (google && google.enabled) {
-      return googleAuthMiddleware(config)(req, res, next);
-      // const authHeader = req.headers["authorization"];
-      // if (authHeader) {
-      //   logger.info("JWT header found in Google OAuth, verifying");
-      //   const token = authHeader.split(" ")[1];
-
-      //   jsonWebToken.verify(token, google.secret, (err, user) => {
-      //     if (err) {
-      //       logger.warn("Invalid or expired token", { error: err.message });
-      //       return res.status(403).json({ error: "Token is invalid or expired" });
-      //     }
-
-      //     logger.info(`JWT verified successfully for Google OAuth`);
-      //     req.user = user;
-      //     next();
-      //   });
-      // } else {
-      //   return res.status(401).json({ error: "Unauthorized" });
-      // }
+      return googleAuthMiddleware(configurations)(req, res, (err) => {
+        if (err) {
+          logger.warn("Google OAuth verification failed", { error: err.message });
+          return res.status(403).json({ error: "Google OAuth token is invalid or expired" });
+        }
+        checkPermission(req.user);
+      });
+    
     } else {
       logger.warn("Authentication is not configured");
       return res.status(500).json({ error: "Authentication not configured" });
