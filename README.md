@@ -166,15 +166,19 @@ The logs option controls the level of logging displayed during authentication.
 
 - **logs: false** → Suppresses info logs and only shows warn logs (e.g., unauthorized access, expired tokens).
 
-Example Logs When logs: true
+#### Example Logs When logs: true
 
+```
 [2025-02-05 10:30:15.234 AM] info: JWT Middleware Started...
 [2025-02-05 10:30:16.456 AM] info: Authorization Header Found!
-[2025-02-05 10:30:17.789 AM] info: JWT Verified Successfully! User: exampleUser
+[2025-02-05 10:30:17.789 AM] info: JWT Verified Successfully!
+```
 
 - **Example Logs When logs**: false
 
+```
 [2025-02-05 10:30:18.234 AM] warn: Unauthorized access attempt (JWT missing)
+```
 
 ## Authentication Flow
 
@@ -232,7 +236,7 @@ GET /auth/google/callback
 ### **Get User Details (Protected Route)**
 
 ```http
-GET /user
+GET /me
 Authorization: Bearer <token>
 ```
 
