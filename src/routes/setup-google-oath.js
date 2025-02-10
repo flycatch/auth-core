@@ -2,9 +2,11 @@ const passport = require("passport");
 const jwt = require("jsonwebtoken");
 const express = require("express");
 
-const logger = require("../lib/wintson.logger");
+const createLogger = require("../lib/wintson.logger");
 
 module.exports = (router, config) => {
+  const logger = createLogger(config);
+
   router.use(express.json());
   router.get(
     "/auth/google/login",

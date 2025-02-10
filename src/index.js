@@ -1,13 +1,14 @@
 const express = require("express");
-const logger = require("./lib/wintson.logger");
+const createLogger = require("./lib/wintson.logger");
 const jwtRoutes = require("./routes/jwt");
 const sessionRoutes = require("./routes/session");
 const setupGoogleRoutes = require("./routes/setup-google-oath");
-const  setupSession  = require("./config/setupSession");
-const  setupGoogleOath  = require("./config/setupGoogleOath");
-const  jwtMiddleware  = require("./middlewares/jwtMiddleware");
-const  sessionMiddleware  = require("./middlewares/sessionMiddleware");
-const  googleAuthMiddleware  = require("./middlewares/googleAuthMiddleware");
+const setupSession  = require("./config/setupSession");
+const setupGoogleOath  = require("./config/setupGoogleOath");
+const jwtMiddleware  = require("./middlewares/jwtMiddleware");
+const sessionMiddleware  = require("./middlewares/sessionMiddleware");
+const googleAuthMiddleware  = require("./middlewares/googleAuthMiddleware");
+const userRoutes = require("./routes/user");
 
 // Configuration storage
 let configurations = {};
@@ -15,6 +16,10 @@ let configurations = {};
 // Function to initialize configurations and set up routes
 function config(config) {
   configurations = config;
+
+  const logger = createLogger(config);
+  logger.info('Info logs enabled'); // Will be shown only if logs: true
+
   const router = express.Router();
 
   // Set up routes if JWT is enabled
@@ -33,6 +38,10 @@ function config(config) {
     setupGoogleOath(config);
     setupGoogleRoutes(router, config);
   }
+
+  // Register /me route
+  userRoutes(router, configurations);
+
 
   return router;
 }

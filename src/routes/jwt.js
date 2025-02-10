@@ -1,8 +1,10 @@
 const jwt = require("jsonwebtoken");
 const express = require("express");
-const logger = require("../lib/wintson.logger");
+const createLogger = require("../lib/wintson.logger");
 
 module.exports = (router, config) => {
+  const logger = createLogger(config);
+
   router.use(express.json()); 
   const   prefix = config.jwt.prefix || "/auth/jwt";
 
@@ -33,40 +35,54 @@ module.exports = (router, config) => {
     return refreshToken;
   };
 
-  // Login Route
-  router.post(`${prefix}/login`, async (req, res) => {
-    const { username, password } = req.body;
+// Login Route
+router.post(`${prefix}/login`, async (req, res) => {
+  const { username, password } = req.body;
 
-    logger.info(`Login attempt `);
-    try {
-      const user = await config.user_service.load_user(username);
-      if (!user) {
-        logger.warn(`Login failed: User not found (username: ${username})`);
-        return res.status(401).json({ error: "Invalid username or password" });
-      }
-
-      const isValidPassword = await config.password_checker(
-        password,
-        user.password
-      );
-      if (!isValidPassword) {
-        logger.warn(`Login failed: Incorrect password `);
-        return res.status(401).json({ error: "Invalid username or password" });
-      }
-
-      const accessToken = await createAccessToken(user);
-      const refreshToken = await createRefreshToken(user);
-      logger.info(`Login successful `);
-      res.json({ accessToken, refreshToken });
-    } catch (error) {
-      logger.error(`JWT Login Error for username: ${username}`, { error });
-      res.status(500).json({ error: "Internal Server Error" });
+  logger.info(` Login attempt...`);
+  try {
+    const user = await config.user_service.load_user(username);
+    if (!user) {
+      logger.warn(` Login failed: User not found (username: ${username})`);
+      return res.status(401).json({ error: "Invalid username or password" });
     }
-  });
+
+    const isValidPassword = await config.password_checker(password, user.password);
+    if (!isValidPassword) {
+      logger.warn(` Login failed: Incorrect password`);
+      return res.status(401).json({ error: "Invalid username or password" });
+    }
+
+    // Create an access token
+    const accessToken = await createAccessToken(user);
+    let responsePayload = { accessToken };
+
+    // Check if refresh token is enabled before generating it
+    if (config.jwt?.refresh) {
+      responsePayload.refreshToken = await createRefreshToken(user);
+    } else {
+      logger.info(" Skipping refresh token generation (refresh is disabled)");
+    }
+
+    logger.info(` Login successful!`);
+    res.json(responsePayload);
+  } catch (error) {
+    logger.error(` JWT Login Error for username: ${username}`, { error });
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
 
   // Refresh Token Route
   if (config.jwt.refresh) {
     router.post(`${prefix}/refresh`, async (req, res) => {
+
+       // Ensure JWT refresh is enabled in the config
+    if (!config.jwt?.refresh) {
+      logger.error(" JWT refresh is disabled in the configuration.");
+      return res.status(500).json({ error: "JWT refresh is not allowed" });
+    }
+
       const authHeader = req.headers["authorization"];
       logger.info(`Refresh token attempt received`);
       if (!authHeader) {

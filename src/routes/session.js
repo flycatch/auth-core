@@ -1,7 +1,10 @@
-const logger = require('../lib/wintson.logger');
+const createLogger = require('../lib/wintson.logger');
 const express = require("express");
 
 module.exports = (router, config) => {
+
+    const logger = createLogger(config);
+
     router.use(express.json()); 
     const prefix = config.session.prefix || '/auth/session';
 
