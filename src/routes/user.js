@@ -1,5 +1,7 @@
 const jwt = require("jsonwebtoken");
 const createLogger = require("../lib/wintson.logger");
+const apiResponse = require("../utils/api-response");
+
 
 module.exports = (router, config) => {
   const logger = createLogger(config);
@@ -20,16 +22,16 @@ module.exports = (router, config) => {
               logger.warn(" JWT verification failed", { error: err.message });
               return res
                 .status(403)
-                .json({ error: "Token is invalid or expired" });
+                .json(apiResponse(403, "Token is Invalid or Expired", false));
             }
 
             logger.info(" JWT verified successfully");
             const userInfo = await config.user_service.load_user(user.username);
             if (!userInfo) {
-              return res.status(404).json({ error: "User not found" });
+              return res.status(404).json(apiResponse(404, "User not found", false));
             }
 
-            return res.json({ userInfo });
+            return res.json(apiResponse(200, "User Details", true, [userInfo]));
           });
         }
       }
@@ -41,9 +43,9 @@ module.exports = (router, config) => {
           req.session.user.username
         );
         if (!userInfo) {
-          return res.status(404).json({ error: "User not found" });
+          return res.status(404).json(apiResponse(404,"User not found", false));
         }
-        return res.json({ userInfo });
+        return res.json(200, "User Found", true, [userInfo]);
       }
 
       //  Google OAuth Authentication Check
@@ -60,25 +62,25 @@ module.exports = (router, config) => {
               });
               return res
                 .status(403)
-                .json({ error: "Token is invalid or expired" });
+                .json(apiResponse(403, "Token is invalid or expired", false));
             }
 
             logger.info(" Google OAuth token verified successfully");
             const userInfo = await config.user_service.load_user(user.username);
             if (!userInfo) {
-              return res.status(404).json({ error: "User not found" });
+              return res.status(404).json(apiResponse(404, "User not found", false));
             }
 
-            return res.json({ userInfo });
+            return res.json(apiResponse(200, "User Found", true, [userInfo]));
           });
         }
       }
 
       logger.warn(" No authentication method found in the request");
-      return res.status(401).json({ error: "Unauthorized" });
+      return res.status(401).json(apiResponse(401, "Unauthorized", false));
     } catch (error) {
       logger.error(" Error in /me route", { error: error.message });
-      return res.status(500).json({ error: "Internal server error" });
+      return res.status(500).json(apiResponse(500, "Internal server error", false));
     }
   });
 };
