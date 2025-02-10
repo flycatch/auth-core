@@ -2,11 +2,12 @@ const jwt = require("jsonwebtoken");
 const createLogger = require("../lib/wintson.logger");
 
 module.exports = (config) => {
-  logger.info(" Initializing JWT Middleware...");
 
   return function (req, res, next) {
 
     const logger = createLogger(config);
+    logger.info(" Initializing JWT Middleware...");
+
 
     logger.info(" JWT Middleware Started...");
 
