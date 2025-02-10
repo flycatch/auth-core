@@ -88,7 +88,7 @@ router.post(`${prefix}/login`, async (req, res) => {
       logger.info(`Refresh token attempt received`);
       if (!authHeader) {
         logger.warn("Refresh token missing in request");
-        return res.status(400).json(400, "Refresh token is required", false);
+        return res.status(400).json(apiResponse(400, "Refresh token is required", false));
       }
 
       try {
@@ -104,7 +104,7 @@ router.post(`${prefix}/login`, async (req, res) => {
 
           if (user.type !== "refresh") {
             logger.warn("Invalid token type for refresh");
-            return res.status(403).json(apiResponse, 403, "Invalid token type", false);
+            return res.status(403).json(apiResponse(403, "Invalid token type", false));
           }
           const accessToken = await createAccessToken(user);
           const refreshToken = await createRefreshToken(user);
