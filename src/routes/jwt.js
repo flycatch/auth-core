@@ -1,8 +1,11 @@
 const jwt = require("jsonwebtoken");
 const express = require("express");
-const logger = require("../lib/wintson.logger");
+const createLogger = require("../lib/wintson.logger");
+const apiResponse = require("../utils/api-response");
 
 module.exports = (router, config) => {
+  const logger = createLogger(config);
+
   router.use(express.json()); 
   const   prefix = config.jwt.prefix || "/auth/jwt";
 
@@ -33,45 +36,59 @@ module.exports = (router, config) => {
     return refreshToken;
   };
 
-  // Login Route
-  router.post(`${prefix}/login`, async (req, res) => {
-    const { username, password } = req.body;
+// Login Route
+router.post(`${prefix}/login`, async (req, res) => {
+  const { username, password } = req.body;
 
-    logger.info(`Login attempt `);
-    try {
-      const user = await config.user_service.load_user(username);
-      if (!user) {
-        logger.warn(`Login failed: User not found (username: ${username})`);
-        return res.status(401).json({ error: "Invalid username or password" });
-      }
-
-      const isValidPassword = await config.password_checker(
-        password,
-        user.password
-      );
-      if (!isValidPassword) {
-        logger.warn(`Login failed: Incorrect password `);
-        return res.status(401).json({ error: "Invalid username or password" });
-      }
-
-      const accessToken = await createAccessToken(user);
-      const refreshToken = await createRefreshToken(user);
-      logger.info(`Login successful `);
-      res.json({ accessToken, refreshToken });
-    } catch (error) {
-      logger.error(`JWT Login Error for username: ${username}`, { error });
-      res.status(500).json({ error: "Internal Server Error" });
+  logger.info(` Login attempt...`);
+  try {
+    const user = await config.user_service.load_user(username);
+    if (!user) {
+      logger.warn(` Login failed: User not found (username: ${username})`);
+      return res.status(401).json(apiResponse(401,"Invalid username or password",false));
     }
-  });
+
+    const isValidPassword = await config.password_checker(password, user.password);
+    if (!isValidPassword) {
+      logger.warn(` Login failed: Incorrect password`);
+      return res.status(401).json(apiResponse(401,"Invalid username or password",false));
+    }
+
+    // Create an access token
+    const accessToken = await createAccessToken(user);
+    let responsePayload = { accessToken };
+
+    // Check if refresh token is enabled before generating it
+    if (config.jwt?.refresh) {
+      responsePayload.refreshToken = await createRefreshToken(user);
+    } else {
+      logger.info(" Skipping refresh token generation (refresh is disabled)");
+    }
+
+    logger.info(` Login successful!`);
+    res.json(apiResponse(200,"Login Successfull", true,[responsePayload]));
+  } catch (error) {
+    logger.error(` JWT Login Error for username: ${username}`, { error });
+    res.status(500).json(apiResponse(500, "Internal Server Error", false));
+  }
+});
+
 
   // Refresh Token Route
   if (config.jwt.refresh) {
     router.post(`${prefix}/refresh`, async (req, res) => {
+
+       // Ensure JWT refresh is enabled in the config
+    if (!config.jwt?.refresh) {
+      logger.error(" JWT refresh is disabled in the configuration.");
+      return res.status(500).json(apiResponse(500, "JWT refresh is not allowed", false));
+    }
+
       const authHeader = req.headers["authorization"];
       logger.info(`Refresh token attempt received`);
       if (!authHeader) {
         logger.warn("Refresh token missing in request");
-        return res.status(400).json({ error: "Refresh token is required" });
+        return res.status(400).json(apiResponse(400, "Refresh token is required", false));
       }
 
       try {
@@ -82,22 +99,22 @@ module.exports = (router, config) => {
             logger.warn("Invalid refresh token provided", {
               error: err.message,
             });
-            return res.status(403).json({ error: "Invalid refresh token" });
+            return res.status(403).json(apiResponse(403,"Invalid refresh token", false));
           }
 
           if (user.type !== "refresh") {
             logger.warn("Invalid token type for refresh");
-            return res.status(403).json({ error: "Invalid token type" });
+            return res.status(403).json(apiResponse(403, "Invalid token type", false));
           }
           const accessToken = await createAccessToken(user);
           const refreshToken = await createRefreshToken(user);
 
           logger.info(`Access token refreshed`);
-          res.json({ accessToken, refreshToken });
+          res.json(apiResponse(201, "Access token Refreshed", true, [accessToken, refreshToken]));
         });
       } catch (error) {
         logger.error("JWT Refresh Error", { error });
-        res.status(500).json({ error: "Internal Server Error" });
+        res.status(500).json(apiResponse(500, "Internal Server Error", false));
       }
     });
   }
