@@ -9,7 +9,7 @@ module.exports = (router, config) => {
     router.post(`${prefix}/login`, async (req, res) => {
         const { username, password } = req.body;
 
-        logger.info(` session login attempt for username: ${username}`);
+        logger.info(` session login attempt `);
         try {
 
             const user = await config.user_service.load_user(username);
@@ -23,11 +23,16 @@ module.exports = (router, config) => {
                 logger.warn(`Login failed: invalid password`);
                 res.status(401).json({ error: 'Invalid username or password'})
             }
-
+            const payload = {
+                id: user.id,
+                username: user.username,
+                type: "access",
+                ...(user.grands && user.grands.length > 0 && { grands: user.grands }) // Add only if user.grands exists and is not empty
+              };
             // Store user details in session
-            req.session.user = { username: user.username };
+            req.session.user = payload;
            
-            logger.info(`session Login successfull for username: ${username}`);
+            logger.info(`session Login successfull `);
             res.json({message: 'Login Successfull'});
         }
         catch(error) {

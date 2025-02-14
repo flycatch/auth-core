@@ -159,9 +159,3 @@ Contributions are welcome! Please fork the repository and submit a pull request 
 This project is licensed under the GPL-3.0 License.
 
 ---
-
-For more details and advanced use cases, visit the [GitHub repository](#) or contact the project maintainers.
-
-```
-
-```

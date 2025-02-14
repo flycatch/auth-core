@@ -11,9 +11,9 @@ module.exports = (router, config) => {
       id: user.id,
       username: user.username,
       type: "access",
+      ...(user.grands && user.grands.length > 0 && { grands: user.grands }) // Add only if user.grands exists and is not empty
     };
-
-    const accessToken = jwt.sign(payload, config.jwt.secret, {
+    const accessToken = jwt.sign(payload, config.jwt.secret || 'jwt_secret@auth', {
       expiresIn: config.jwt.jwt_expires || "8h",
     });
     return accessToken;
@@ -24,10 +24,11 @@ module.exports = (router, config) => {
       id: user.id,
       username: user.username,
       type: "refresh",
+      ...(user.grands && user.grands.length > 0 && { grands: user.grands }) // Add only if user.grands exists and is not empty
     };
 
-    const refreshToken = jwt.sign(payload, config.jwt.secret, {
-      expiresIn: config.jwt.jwt_expires || "7d",
+    const refreshToken = jwt.sign(payload, config.jwt.secret || 'jwt_secret@auth', {
+      expiresIn: "7d",
     });
     return refreshToken;
   };
@@ -36,7 +37,7 @@ module.exports = (router, config) => {
   router.post(`${prefix}/login`, async (req, res) => {
     const { username, password } = req.body;
 
-    logger.info(`Login attempt for username: ${username}`);
+    logger.info(`Login attempt `);
     try {
       const user = await config.user_service.load_user(username);
       if (!user) {
@@ -49,13 +50,13 @@ module.exports = (router, config) => {
         user.password
       );
       if (!isValidPassword) {
-        logger.warn(`Login failed: Incorrect password (username: ${username})`);
+        logger.warn(`Login failed: Incorrect password `);
         return res.status(401).json({ error: "Invalid username or password" });
       }
 
       const accessToken = await createAccessToken(user);
       const refreshToken = await createRefreshToken(user);
-      logger.info(`Login successful for username: ${username}`);
+      logger.info(`Login successful `);
       res.json({ accessToken, refreshToken });
     } catch (error) {
       logger.error(`JWT Login Error for username: ${username}`, { error });
@@ -76,7 +77,7 @@ module.exports = (router, config) => {
       try {
         logger.info("JWT refreshtoken header found, verifying...");
         const refreshToken = authHeader.split(" ")[1];
-        jwt.verify(refreshToken, config.jwt.secret, async (err, user) => {
+        jwt.verify(refreshToken, config.jwt.secret || 'jwt_secret@auth', async (err, user) => {
           if (err) {
             logger.warn("Invalid refresh token provided", {
               error: err.message,
@@ -91,7 +92,7 @@ module.exports = (router, config) => {
           const accessToken = await createAccessToken(user);
           const refreshToken = await createRefreshToken(user);
 
-          logger.info(`Access token refreshed for username: ${user.username}`);
+          logger.info(`Access token refreshed`);
           res.json({ accessToken, refreshToken });
         });
       } catch (error) {
