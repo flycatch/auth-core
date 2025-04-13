@@ -1,10 +1,12 @@
 const passport = require("passport");
 const jwt = require("jsonwebtoken");
 const express = require("express");
-
-const logger = require("../lib/wintson.logger");
+const apiResponse = require("../utils/api-response")
+const createLogger = require("../lib/wintson.logger");
 
 module.exports = (router, config) => {
+  const logger = createLogger(config);
+
   router.use(express.json());
   router.get(
     "/auth/google/login",
@@ -49,20 +51,14 @@ module.exports = (router, config) => {
 
         const accessToken = await createAccessToken(req.user);
         const refreshToken = await createRefreshToken(req.user);
-        console.log('callback fun', accessToken);
-        // Send the token in the response
-        res.json({
-          message: "Google OAuth successful",
-          accessToken: accessToken,
-          refreshToken: refreshToken,
-        });
+        res.json(apiResponse(201, "Google Oath Successfull", true,[accessToken, refreshToken]));
         logger.info("User successfully logged in with Google OAuth");
       } catch (err) {
         logger.error("Error during Google OAuth callback", {
           error: err.message,
           stack: err.stack,
         });
-        res.status(500).json({ error: "Internal server error" });
+        res.status(500).json(apiResponse(500, "Internal server error", false));
       }
     }
   );

@@ -1,7 +1,11 @@
-const logger = require('../lib/wintson.logger');
+const createLogger = require('../lib/wintson.logger');
 const express = require("express");
+const apiResponse = require("../utils/api-response");
 
 module.exports = (router, config) => {
+
+    const logger = createLogger(config);
+
     router.use(express.json()); 
     const prefix = config.session.prefix || '/auth/session';
 
@@ -15,13 +19,13 @@ module.exports = (router, config) => {
             const user = await config.user_service.load_user(username);
             if (!user) {
                 logger.warn(`Login failed: User not found (username ${username})`);
-                res.status(401).json({ error: 'Invalid username or password'});
+                res.status(401).json(apiResponse(401,'Invalid username or password', false));
             }
             
             const validPassword = await config.password_checker(password, user.password);
             if (!validPassword) {
                 logger.warn(`Login failed: invalid password`);
-                res.status(401).json({ error: 'Invalid username or password'})
+                res.status(401).json(apiResponse(401, 'Invalid username or password', false))
             }
             const payload = {
                 id: user.id,
@@ -33,11 +37,11 @@ module.exports = (router, config) => {
             req.session.user = payload;
            
             logger.info(`session Login successfull `);
-            res.json({message: 'Login Successfull'});
+            res.json(apiResponse(201, 'Login Successfull', true, [payload]));
         }
         catch(error) {
             logger.error(`session Login error for username ${username} `, error );
-            res.status(500).json({ error: 'Internal server error' });
+            res.status(500).json(apiResponse(500, 'Internal server error', false));
         }
     })
 }
