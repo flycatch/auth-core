@@ -8,7 +8,6 @@ const setupGoogleOath  = require("./config/setupGoogleOath");
 const jwtMiddleware  = require("./middlewares/jwtMiddleware");
 const sessionMiddleware  = require("./middlewares/sessionMiddleware");
 const googleAuthMiddleware  = require("./middlewares/googleAuthMiddleware");
-const userRoutes = require("./routes/user");
 
 // Configuration storage
 let configurations = {};
@@ -38,10 +37,6 @@ function config(config) {
     setupGoogleOath(config);
     setupGoogleRoutes(router, config);
   }
-
-  // Register /me route
-  userRoutes(router, configurations);
-
 
   return router;
 }

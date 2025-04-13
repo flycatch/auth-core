@@ -233,17 +233,6 @@ GET /auth/google/login
 GET /auth/google/callback
 ```
 
-### **Get User Details (Protected Route)**
-
-```http
-GET /me
-Authorization: Bearer <token>
-```
-
-## Conclusion
-
-Auth-Core provides a seamless way to integrate authentication into your Express.js applications with minimal configuration. It simplifies authentication logic and enhances security while maintaining flexibility.
-
 ## Contributing
 
 Contributions are welcome! Please fork the repository and submit a pull request with your improvements.
