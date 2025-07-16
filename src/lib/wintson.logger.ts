@@ -1,7 +1,7 @@
 import winston from "winston";
 const { combine, timestamp, printf, colorize, align } = winston.format;
 
-export const logger = winston.createLogger({
+const logger = winston.createLogger({
   level: "debug",
   format: combine(
     colorize({ all: true }),
@@ -13,3 +13,5 @@ export const logger = winston.createLogger({
   ),
   transports: [new winston.transports.Console()],
 });
+
+export default logger;
