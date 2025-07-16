@@ -2,8 +2,8 @@
   "name": "@flycatch/auth-core",
   "version": "1.1.6",
   "description": "A unified authentication module for Express.js, NestJS frameworks, supporting JWT, session-based, and Google OAuth login.",
-  "main": "src/index.js",
-  "types": "src/index.d.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/flycatch/auth-core.git"
@@ -16,7 +16,10 @@
     "express",
     "passportjs"
   ],
-  "scripts": {},
+  "scripts": {
+    "build": "tsc"
+  },
+  "files": ["dist"],
   "author": "flycatch",
   "license": "GPL-3.0",
   "dependencies": {
@@ -29,5 +32,17 @@
     "passport-jwt": "^4.0.1",
     "passport-local": "^1.0.0",
     "winston": "^3.15.0"
+  },
+  "devDependencies": {
+    "@types/body-parser": "^1.19.6",
+    "@types/express": "^5.0.3",
+    "@types/express-session": "^1.18.2",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/passport": "^1.0.17",
+    "@types/passport-google-oauth20": "^2.0.16",
+    "@types/passport-jwt": "^4.0.1",
+    "@types/passport-local": "^1.0.38",
+    "@types/winston": "^2.4.4",
+    "typescript": "^5.8.3"
   }
 }
