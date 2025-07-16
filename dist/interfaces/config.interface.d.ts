@@ -12,7 +12,7 @@ interface SessionConfig {
 interface JwtConfig {
     enabled: boolean;
     secret: string;
-    expiresIn?: string;
+    expiresIn?: `${number}${"s" | "m" | "h" | "d" | "w" | "y"}` | number;
     refresh?: boolean;
     prefix?: string;
 }
