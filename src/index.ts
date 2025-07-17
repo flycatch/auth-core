@@ -11,8 +11,8 @@ import Config from "./interfaces/config.interface";
 import JWTPayload from "./interfaces/jwt.interface";
 
 class AuthCore {
-  configurations: {};
-  router: Router;
+  private configurations: {};
+  private router: Router;
   constructor() {
     this.configurations = {};
     this.router = Router();

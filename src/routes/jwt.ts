@@ -1,11 +1,10 @@
 import jwt from "jsonwebtoken";
-import express, { Router } from "express";
+import express, { Request, Response, Router } from "express";
 import logger from "../lib/wintson.logger";
 import Config from "../interfaces/config.interface";
 import JWTPayload from "../interfaces/jwt.interface";
 
 export default (router: Router, config: Config) => {
-  router.use(express.json());
   if (!config.jwt) {
     throw new Error("JWT configuration with secret is required");
   }
@@ -23,7 +22,7 @@ export default (router: Router, config: Config) => {
     }
 
     const accessToken = jwt.sign(payload, config.jwt.secret, {
-      expiresIn: config.jwt.expiresIn  || "8h",
+      expiresIn: config.jwt.expiresIn || "8h",
     });
     return accessToken;
   };
@@ -45,8 +44,9 @@ export default (router: Router, config: Config) => {
     return refreshToken;
   };
 
+  router.use(express.json());
   // Login Route
-  router.post(`${prefix}/login`, async (req, res) => {
+  router.post(`${prefix}/login`, async (req: Request, res: Response) => {
     const { username, password } = req.body;
 
     logger.info(`Login attempt for username: ${username}`);
