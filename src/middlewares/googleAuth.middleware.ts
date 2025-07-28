@@ -1,9 +1,11 @@
-const jwt = require("jsonwebtoken");
-const createLogger = require("../lib/wintson.logger");
+import jwt from "jsonwebtoken";
+import createLogger from "../lib/wintson.logger";
+import { Config } from "../interfaces/config.interface";
+import { NextFunction, Request, Response } from "express";
+import { JWTPayload } from "../interfaces/jwt.interface";
 
-module.exports = (config) => {
-
-  return function (req, res, next) {
+export default (config: Config) => {
+  return function (req: Request, res: Response, next: NextFunction) {
     const logger = createLogger(config);
 
     logger.info(" Initializing Google OAuth Middleware...");
@@ -23,15 +25,26 @@ module.exports = (config) => {
     const token = authHeader.split(" ")[1];
     logger.info(" Google OAuth Authorization Header Found!");
 
-    jwt.verify(token, config.google.secret, (err, user) => {
+    if (!config.google.secret) {
+      logger.error(" Google OAuth secret is not configured!");
+      return res.status(500).json({ error: "Google OAuth secret is missing" });
+    }
+
+    jwt.verify(token, config.google.secret as jwt.Secret, (err, decoded: any) => {
       if (err) {
-        logger.warn(" Invalid or Expired Google OAuth Token!", { error: err.message });
+        logger.warn(" Invalid or Expired Google OAuth Token!", {
+          error: err.message,
+        });
         return res.status(403).json({ error: "Token is invalid or expired" });
       }
 
+      const user = decoded as JWTPayload;
+
       // Check if the token type is 'access'
       if (user.type !== "access") {
-        logger.warn(" Invalid Google OAuth token type: Only 'access' tokens are allowed!");
+        logger.warn(
+          " Invalid Google OAuth token type: Only 'access' tokens are allowed!"
+        );
         return res.status(403).json({ error: "Invalid token type" });
       }
 
