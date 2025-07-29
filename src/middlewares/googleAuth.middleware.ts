@@ -30,6 +30,7 @@ export default (config: Config) => {
       return res.status(500).json({ error: "Google OAuth secret is missing" });
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     jwt.verify(token, config.google.secret as jwt.Secret, (err, decoded: any) => {
       if (err) {
         logger.warn(" Invalid or Expired Google OAuth Token!", {

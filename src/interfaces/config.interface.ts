@@ -31,6 +31,7 @@ export interface Config {
   session?: SessionConfig;
   google?: GoogleConfig;
   userService: {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     loadUser: (email: string) => Promise<any>;
   };
   passwordChecker: (

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Router } from "express";
 import { Config } from "../interfaces/config.interface";
 import jwt from "jsonwebtoken";
@@ -85,6 +86,7 @@ export default (router: Router, config: Config) => {
 
       // Create an access token
       const accessToken = await createAccessToken(user);
+      // eslint-disable-next-line prefer-const
       let responsePayload: { accessToken: string; refreshToken?: string } = {
         accessToken,
       };
