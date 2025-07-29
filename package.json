@@ -17,7 +17,8 @@
     "passportjs"
   ],
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "test":"echo \" no test configured\""
   },
   "files": [
     "dist"
