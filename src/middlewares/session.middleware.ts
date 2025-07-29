@@ -1,7 +1,9 @@
-const createLogger = require("../lib/wintson.logger");
+import { NextFunction, Request, Response } from "express";
+import { Config } from "../interfaces/config.interface";
+import createLogger from "../lib/wintson.logger";
 
-module.exports = (config) => {
-  return function (req, res, next) {
+export default (config: Config) => {
+  return function (req: Request, res: Response, next: NextFunction) {
     const logger = createLogger(config);
 
     logger.info("Initializing Session Middleware...");
@@ -15,7 +17,9 @@ module.exports = (config) => {
     if (req.session && req.session.user) {
       // Check if the token type is 'access'
       if (req.session.user.type !== "access") {
-        logger.warn(" Invalid session type: Only 'access' sessions are allowed!");
+        logger.warn(
+          " Invalid session type: Only 'access' sessions are allowed!"
+        );
         return res.status(403).json({ error: "Invalid session type" });
       }
 

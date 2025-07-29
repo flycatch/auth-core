@@ -58,10 +58,10 @@ app.use(
       callbackURL: "/auth/google/callback",
       secret: "google_secret",
     },
-    user_service: {
-      load_user: async (email) => userRepository.find(email),
+    userService: {
+      loadUser: async (email) => userRepository.find(email),
     },
-    password_checker: async (inputPassword, storedPassword) =>
+    passwordChecker: async (inputPassword, storedPassword) =>
       bcrypt.compare(inputPassword, storedPassword),
     logs: true,
   })
