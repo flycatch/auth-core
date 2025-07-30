@@ -241,4 +241,8 @@ Contributions are welcome! Please fork the repository and submit a pull request 
 
 This project is licensed under the GPL-3.0 License.
 
+## More
+
+- [How to use in Nest JS](./docs/nestjs_usage.md)
+
 ---
