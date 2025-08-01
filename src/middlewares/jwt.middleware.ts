@@ -28,6 +28,7 @@ export default (config: Config) => {
     jwt.verify(
       token,
       config.jwt.secret || "jwt_secret@auth",
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (err: any, decoded: any) => {
         if (err) {
           logger.warn(" Invalid or expired token", { error: err.message });

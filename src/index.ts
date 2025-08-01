@@ -52,6 +52,7 @@ function verify(
     const logger = createLogger(configurations);
 
     //  Ensure user has permissions
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const checkPermission = (user: any) => {
       if (permission && (!user.grands || !user.grands.includes(permission))) {
         logger.warn(

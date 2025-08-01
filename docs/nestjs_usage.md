@@ -178,3 +178,7 @@ Contributions are welcome! Fork the repository and create a PR with your changes
 ## License
 
 GPL-3.0 License. See the `LICENSE` file for details.
+
+---
+
+## [Back](../README.md)

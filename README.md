@@ -140,20 +140,20 @@ google: {
 ### **User Service Integration**
 
 ```javascript
-user_service: {
-  load_user: async (email) => userRepository.find(email),
+userService: {
+  loadUser: async (email) => userRepository.find(email),
 },
 ```
 
-- **load_user**: A function that fetches user details from a database based on the email provided.
+- **loadUser**: A function that fetches user details from a database based on the email provided.
 
 ### **Custom Password Checker**
 
 ```javascript
-password_checker: async (inputPassword, storedPassword) => bcrypt.compare(inputPassword, storedPassword),
+passwordChecker: async (inputPassword, storedPassword) => bcrypt.compare(inputPassword, storedPassword),
 ```
 
-- **password_checker**: A function to verify if the provided password matches the stored password (used for login authentication).
+- **passwordChecker**: A function to verify if the provided password matches the stored password (used for login authentication).
 
 ### **Logging Configuration (logs)**
 
@@ -240,5 +240,9 @@ Contributions are welcome! Please fork the repository and submit a pull request 
 ## License
 
 This project is licensed under the GPL-3.0 License.
+
+## More
+
+- [How to use in Nest JS](./docs/nestjs_usage.md)
 
 ---
