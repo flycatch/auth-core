@@ -21,7 +21,6 @@
   "license": "GPL-3.0",
   "dependencies": {
     "body-parser": "^1.20.3",
-    "express": "^4.21.2",
     "express-session": "^1.18.1",
     "jsonwebtoken": "^9.0.2",
     "passport": "^0.7.0",
@@ -29,5 +28,8 @@
     "passport-jwt": "^4.0.1",
     "passport-local": "^1.0.0",
     "winston": "^3.15.0"
+  },
+  "peerDependencies": {
+    "express": ">=4.21.2"
   }
 }
