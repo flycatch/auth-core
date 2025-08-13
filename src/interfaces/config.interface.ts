@@ -25,10 +25,30 @@ interface GoogleConfig {
   prefix?: string;
 }
 
+interface TwoFAConfig {
+  enabled: boolean;
+  otpLength: number;
+  otpExpiresIn: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  transport: (otp: string, user: any) => Promise<void>;
+  storeOtp: (userId: string, otp: string, expiresInMs: string) => Promise<void>;
+  getStoredOtp: (userId: string) => Promise<string | null>;
+  clearOtp: (userId: string) => Promise<void>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onOtpGenerated?: (otp: string, user: any) => Promise<void>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onOtpSent?: (user: any) => Promise<void>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onVerifySuccess?: (user: any) => Promise<void>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onVerifyFail?: (user: any, error: any) => Promise<void>;
+}
+
 export interface Config {
   jwt?: JwtConfig;
   session?: SessionConfig;
   google?: GoogleConfig;
+  twoFA?: TwoFAConfig;
   userService: {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     loadUser: (email: string) => Promise<any>;
