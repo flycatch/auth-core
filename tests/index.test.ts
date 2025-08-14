@@ -10,7 +10,6 @@ import setupSession from "../src/config/session.config";
 import setupGoogleOath from "../src/config/google.config";
 import jwtMiddleware from "../src/middlewares/jwt.middleware";
 import sessionMiddleware from "../src/middlewares/session.middleware";
-import googleAuthMiddleware from "../src/middlewares/googleAuth.middleware";
 import indexModule from "../src/index";
 
 jest.mock("../src/lib/wintson.logger", () => () => ({
@@ -23,9 +22,12 @@ jest.mock("../src/routes/session.routes");
 jest.mock("../src/routes/google.routes");
 jest.mock("../src/config/session.config");
 jest.mock("../src/config/google.config");
-jest.mock("../src/middlewares/jwt.middleware", () => jest.fn(() => (req: any, res: any, next: any) => next()));
-jest.mock("../src/middlewares/session.middleware", () => jest.fn(() => (req: any, res: any, next: any) => next()));
-jest.mock("../src/middlewares/googleAuth.middleware", () => jest.fn(() => (req: any, res: any, next: any) => next()));
+jest.mock("../src/middlewares/jwt.middleware", () =>
+  jest.fn(() => (req: any, res: any, next: any) => next())
+);
+jest.mock("../src/middlewares/session.middleware", () =>
+  jest.fn(() => (req: any, res: any, next: any) => next())
+);
 
 describe("index.ts config function", () => {
   afterEach(() => {
@@ -84,21 +86,15 @@ describe("index.ts verify middleware", () => {
     expect(sessionMiddleware).toHaveBeenCalled();
   });
 
-  it("should use googleAuthMiddleware if Google OAuth is enabled", () => {
-    const config: Config = { google: { enabled: true } } as any;
-    indexModule.config(config);
-    const middleware = indexModule.verify();
-    middleware(req as Request, res as Response, next);
-    expect(googleAuthMiddleware).toHaveBeenCalled();
-  });
-
   it("should return 500 if no authentication is configured", () => {
     const config: Config = {} as any;
     indexModule.config(config);
     const middleware = indexModule.verify();
     middleware(req as Request, res as Response, next);
     expect(res.status).toHaveBeenCalledWith(500);
-    expect(res.json).toHaveBeenCalledWith({ error: "Authentication not configured" });
+    expect(res.json).toHaveBeenCalledWith({
+      error: "Authentication not configured",
+    });
   });
 
   it("should return 403 if permission is missing", () => {
@@ -108,7 +104,9 @@ describe("index.ts verify middleware", () => {
     req.user = { grands: ["user"] };
     middleware(req as Request, res as Response, next);
     expect(res.status).toHaveBeenCalledWith(403);
-    expect(res.json).toHaveBeenCalledWith({ error: "Access denied: Missing required permission" });
+    expect(res.json).toHaveBeenCalledWith({
+      error: "Access denied: Missing required permission",
+    });
   });
 
   it("should call next if permission is present", () => {

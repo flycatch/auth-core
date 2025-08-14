@@ -55,6 +55,15 @@ export default (router: Router, config: Config) => {
     return refreshToken;
   };
 
+  const createSessionPayload = (user: any) => {
+    return {
+      id: user.id,
+      username: user.username,
+      type: "access",
+      ...(user.grands && user.grands.length > 0 && { grands: user.grands }), // Add only if user.grands exists and is not empty
+    };
+  };
+
   router.get(
     `${config.google.prefix ? config.google.prefix : "/auth/google"}/callback`,
     passport.authenticate("google", { session: false }),
@@ -62,15 +71,38 @@ export default (router: Router, config: Config) => {
       try {
         logger.info("Handling Google OAuth callback");
 
-        const accessToken = await createAccessToken(req.user);
-        const refreshToken = await createRefreshToken(req.user);
-        res.json(
-          apiResponse(201, "Google Oath Successfull", true, [
-            accessToken,
-            refreshToken,
-          ])
-        );
-        logger.info("User successfully logged in with Google OAuth");
+        if (!req.user) {
+          logger.error("User Data Missed on callback");
+          return res.status(500).json({ error: "Something went wrong" });
+        }
+
+        if (config.jwt?.enabled) {
+          const accessToken = await createAccessToken(req.user);
+          const refreshToken = await createRefreshToken(req.user);
+          logger.info("User successfully logged in with Google OAuth");
+          res.json(
+            apiResponse(201, "Google Oath Successfull", true, [
+              accessToken,
+              refreshToken,
+            ])
+          );
+        } else if (config.session?.enabled) {
+          const payload = createSessionPayload(req.user);
+          // Store user details in session
+          req.session.user = payload;
+
+          logger.info(`session Login successfull `);
+          return res.json(
+            apiResponse(201, "Login Successfull", true, [payload])
+          );
+        } else {
+          logger.error(
+            "Either Jwt or Session should be configured to get tokens from google OAuth"
+          );
+          res.status(500).json({
+            error: "Either JWT or Session auth configured to use google OAuth",
+          });
+        }
       } catch (err: any) {
         logger.error("Error during Google OAuth callback", {
           error: err.message,
