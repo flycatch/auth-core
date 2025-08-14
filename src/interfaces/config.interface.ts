@@ -22,8 +22,7 @@ interface GoogleConfig {
   enabled: boolean;
   clientID: string;
   clientSecret: string;
-  callbackURL: string;
-  secret?: string;
+  prefix?: string;
 }
 
 export interface Config {

@@ -16,7 +16,9 @@ export default (config: Config): void => {
       {
         clientID: config.google.clientID,
         clientSecret: config.google.clientSecret,
-        callbackURL: config.google.callbackURL,
+        callbackURL: `${
+          config.google.prefix ? config.google.prefix : "/auth/google"
+        }/callback`,
       },
       async (
         accessToken: string,

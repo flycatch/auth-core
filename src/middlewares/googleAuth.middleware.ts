@@ -25,13 +25,13 @@ export default (config: Config) => {
     const token = authHeader.split(" ")[1];
     logger.info(" Google OAuth Authorization Header Found!");
 
-    if (!config.google.secret) {
+    if (!config.jwt?.secret) {
       logger.error(" Google OAuth secret is not configured!");
       return res.status(500).json({ error: "Google OAuth secret is missing" });
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    jwt.verify(token, config.google.secret as jwt.Secret, (err, decoded: any) => {
+    jwt.verify(token, config.jwt?.secret as jwt.Secret, (err, decoded: any) => {
       if (err) {
         logger.warn(" Invalid or Expired Google OAuth Token!", {
           error: err.message,

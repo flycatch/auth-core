@@ -10,9 +10,13 @@ import createLogger from "../lib/wintson.logger";
 export default (router: Router, config: Config) => {
   const logger = createLogger(config);
 
+  if (!config.google) {
+    throw new Error("Google OAuth Not configured");
+  }
+
   router.use(express.json());
   router.get(
-    "/auth/google/login",
+    `${config.google.prefix ? config.google.prefix : "/auth/google"}/login`,
     passport.authenticate("google", { scope: ["profile", "email"] })
   );
 
@@ -52,7 +56,7 @@ export default (router: Router, config: Config) => {
   };
 
   router.get(
-    "/auth/google/callback",
+    `${config.google.prefix ? config.google.prefix : "/auth/google"}/callback`,
     passport.authenticate("google", { session: false }),
     async (req, res) => {
       try {
