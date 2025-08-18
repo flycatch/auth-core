@@ -9,6 +9,7 @@ import setupSession from "./config/session.config";
 import setupGoogleOath from "./config/google.config";
 import jwtMiddleware from "./middlewares/jwt.middleware";
 import sessionMiddleware from "./middlewares/session.middleware";
+import twoFactorAuthRoutes from "./routes/two-factor-auth.routes";
 
 // Configuration storage
 let configurations: Config = {} as Config;
@@ -37,6 +38,10 @@ function config(config: Config): Router {
   if (config.google && config.google.enabled) {
     setupGoogleOath(config);
     setupGoogleRoutes(router, config);
+  }
+
+  if (config.twoFA && config.twoFA.enabled) {
+    twoFactorAuthRoutes(router, config);
   }
 
   return router;

@@ -27,13 +27,14 @@ interface GoogleConfig {
 
 interface TwoFAConfig {
   enabled: boolean;
-  otpLength: number;
-  otpExpiresIn: number;
+  otpLength?: number;
+  otpExpiresIn?: number;
+  prefix?: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  transport: (otp: string, user: any) => Promise<void>;
-  storeOtp: (userId: string, otp: string, expiresInMs: string) => Promise<void>;
-  getStoredOtp: (userId: string) => Promise<string | null>;
-  clearOtp: (userId: string) => Promise<void>;
+  transport?: (otp: string, user: any) => Promise<void>;
+  storeOtp?: (userId: string, otp: string, expiresInMs: string) => Promise<void>;
+  getStoredOtp?: (userId: string) => Promise<string | null>;
+  clearOtp?: (userId: string) => Promise<void>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onOtpGenerated?: (otp: string, user: any) => Promise<void>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

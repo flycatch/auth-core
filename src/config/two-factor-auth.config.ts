@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import ms from "ms"; // Optional dep for parsing '5m' to ms; add if not present
 import { Config } from "../interfaces/config.interface";
+import createLogger from "../lib/wintson.logger";
 
 // Pure: Generate random OTP
 const generateOtp = (length: number): string =>
@@ -11,7 +12,9 @@ const generateOtp = (length: number): string =>
 
 // Higher-order: Create configured handlers
 
-export const create2faHandlers = (config: Config["twoFA"]) => {
+export const create2faHandlers = (appConfig: Config) => {
+  const config = appConfig["twoFA"];
+  const logger = createLogger(appConfig);
   if (!config) {
     throw new Error("No configuration added for 2FA");
   }
@@ -24,13 +27,22 @@ export const create2faHandlers = (config: Config["twoFA"]) => {
   const initiate2fa = async (user: any): Promise<void> => {
     if (!isEnabledForUser(user)) return;
 
-    const otp = generateOtp(config.otpLength);
-    const expiresInMs = ms(config.otpExpiresIn);
+    const otp = generateOtp(config.otpLength ? config.otpLength : 6);
+    const expiresInMs = ms(config.otpExpiresIn ? config.otpExpiresIn : 5000);
 
     if (config.onOtpGenerated) await config.onOtpGenerated(otp, user);
 
-    await config.storeOtp(user.id, otp, expiresInMs);
+    if (!config.storeOtp) {
+      throw new Error("Store OTP Logic should provide if 2fa is enabled");
+    }
 
+    await config.storeOtp(user.id, otp, expiresInMs);
+    if (!config.transport) {
+      logger.warn(
+        "No transport had ben configured to send OTP, check your storage for the generated 2fa otp"
+      );
+      return;
+    }
     try {
       await config.transport(otp, user);
       if (config.onOtpSent) await config.onOtpSent(user);
@@ -43,6 +55,10 @@ export const create2faHandlers = (config: Config["twoFA"]) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const verifyOtp = async (user: any, inputOtp: string): Promise<boolean> => {
     if (!isEnabledForUser(user)) throw new Error("2FA not enabled");
+
+    if (!config.getStoredOtp) {
+      throw new Error("Need to config getStoredOtp logic for otp verification");
+    }
 
     const storedOtp = await config.getStoredOtp(user.id);
     if (!storedOtp) {
@@ -57,7 +73,7 @@ export const create2faHandlers = (config: Config["twoFA"]) => {
       throw error;
     }
 
-    await config.clearOtp(user.id);
+    if (config.clearOtp) await config.clearOtp(user.id);
     if (config.onVerifySuccess) await config.onVerifySuccess(user);
     return true;
   };

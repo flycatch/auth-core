@@ -10,6 +10,7 @@ import setupSession from "../src/config/session.config";
 import setupGoogleOath from "../src/config/google.config";
 import jwtMiddleware from "../src/middlewares/jwt.middleware";
 import sessionMiddleware from "../src/middlewares/session.middleware";
+import twoFactorAuthRoutes from "../src/routes/two-factor-auth.routes";
 import indexModule from "../src/index";
 
 jest.mock("../src/lib/wintson.logger", () => () => ({
@@ -20,6 +21,7 @@ jest.mock("../src/lib/wintson.logger", () => () => ({
 jest.mock("../src/routes/jwt.routes");
 jest.mock("../src/routes/session.routes");
 jest.mock("../src/routes/google.routes");
+jest.mock("../src/routes/two-factor-auth.routes");
 jest.mock("../src/config/session.config");
 jest.mock("../src/config/google.config");
 jest.mock("../src/middlewares/jwt.middleware", () =>
@@ -52,6 +54,12 @@ describe("index.ts config function", () => {
     const router = indexModule.config(config);
     expect(setupGoogleOath).toHaveBeenCalled();
     expect(setupGoogleRoutes).toHaveBeenCalled();
+  });
+
+  it("should setup Twofactor Auth routes if enabled", () => {
+    const config: Config = { twoFA: { enabled: true } } as any;
+    const router = indexModule.config(config);
+    expect(twoFactorAuthRoutes).toHaveBeenCalled();
   });
 });
 
