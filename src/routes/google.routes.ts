@@ -39,7 +39,7 @@ export default (router: Router, config: Config) => {
           logger.info("User successfully logged in with Google OAuth");
           res.json(
             apiResponse(201, "Google OAuth Successful,", true, [
-              jwtTokens
+              { ...jwtTokens },
             ])
           );
         } else if (config.session?.enabled) {

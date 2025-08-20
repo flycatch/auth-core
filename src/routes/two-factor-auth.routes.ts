@@ -93,7 +93,7 @@ export default (router: Router, config: Config) => {
 
           logger.info(`JWT Login Succesful`);
           res.json(
-            apiResponse(200, "Two Factor Oath Successfull", true, [tokens])
+            apiResponse(201, "Two Factor Oath Successfull", true, [tokens])
           );
         } else if (config.session?.enabled) {
           const payload = createSessionPayload(user);
@@ -102,7 +102,7 @@ export default (router: Router, config: Config) => {
 
           logger.info(`session Login successfull `);
           return res.json(
-            apiResponse(200, "Login Successfull", true, [payload])
+            apiResponse(201, "Login Successfull", true, [payload])
           );
         } else {
           logger.error(
