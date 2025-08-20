@@ -99,7 +99,7 @@ export default (router: Router, config: Config) => {
       }
 
       logger.info(` Login successful!`);
-      res.json(apiResponse(200, "Login Successfull", true, [responsePayload]));
+      res.json(apiResponse(200, "Login Successful", true, [responsePayload]));
     } catch (error) {
       logger.error(` JWT Login Error for username: ${username}`, { error });
       res.status(500).json(apiResponse(500, "Internal Server Error", false));
