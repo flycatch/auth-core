@@ -5,6 +5,7 @@ import jwt from "jsonwebtoken";
 import express from "express";
 import createLogger from "../lib/wintson.logger";
 import apiResponse from "../utils/api-response";
+import { createJwtTokens } from "../utils/jwt";
 
 export default (router: Router, config: Config) => {
   if (!config.jwt) {
@@ -15,52 +16,11 @@ export default (router: Router, config: Config) => {
   router.use(express.json());
   const prefix = config.jwt.prefix || "/auth/jwt";
 
-  const createAccessToken = async (user: any) => {
-    const payload = {
-      id: user.id,
-      username: user.username,
-      type: "access",
-      ...(user.grands && user.grands.length > 0 && { grands: user.grands }), // Add only if user.grands exists and is not empty
-    };
-
-    if (!config.jwt) {
-      throw new Error("JWT not cnfigured");
-    }
-
-    const accessToken = jwt.sign(
-      payload,
-      config.jwt?.secret || "jwt_secret@auth",
-      {
-        expiresIn: config.jwt.expiresIn || "8h",
-      }
-    );
-    return accessToken;
-  };
-
-  const createRefreshToken = async (user: any) => {
-    const payload = {
-      id: user.id,
-      username: user.username,
-      type: "refresh",
-      ...(user.grands && user.grands.length > 0 && { grands: user.grands }), // Add only if user.grands exists and is not empty
-    };
-
-    if (!config.jwt) {
-      throw new Error("JWT not cnfigured");
-    }
-
-    const refreshToken = jwt.sign(
-      payload,
-      config.jwt.secret || "jwt_secret@auth",
-      {
-        expiresIn: "7d",
-      }
-    );
-    return refreshToken;
-  };
-
   // Login Route
   router.post(`${prefix}/login`, async (req, res) => {
+    if (!config.jwt) {
+      throw new Error("JWT not cnfigured");
+    }
     const { username, password } = req.body;
 
     logger.info(` Login attempt...`);
@@ -84,22 +44,11 @@ export default (router: Router, config: Config) => {
           .json(apiResponse(401, "Invalid username or password", false));
       }
 
-      // Create an access token
-      const accessToken = await createAccessToken(user);
-      // eslint-disable-next-line prefer-const
-      let responsePayload: { accessToken: string; refreshToken?: string } = {
-        accessToken,
-      };
-
-      // Check if refresh token is enabled before generating it
-      if (config.jwt?.refresh) {
-        responsePayload.refreshToken = await createRefreshToken(user);
-      } else {
-        logger.info(" Skipping refresh token generation (refresh is disabled)");
-      }
+      // Create jwt tokens
+      const jwtTokens = createJwtTokens(config.jwt, user);
 
       logger.info(` Login successful!`);
-      res.json(apiResponse(200, "Login Successful", true, [responsePayload]));
+      res.json(apiResponse(200, "Login Successful", true, [jwtTokens]));
     } catch (error) {
       logger.error(` JWT Login Error for username: ${username}`, { error });
       res.status(500).json(apiResponse(500, "Internal Server Error", false));
@@ -148,15 +97,15 @@ export default (router: Router, config: Config) => {
                 .status(403)
                 .json(apiResponse(403, "Invalid token type", false));
             }
-            const accessToken = await createAccessToken(user);
-            const refreshToken = await createRefreshToken(user);
+
+            if (!config.jwt) {
+              throw new Error("JWT not cnfigured");
+            }
+            const jwtTokens = createJwtTokens(config.jwt, user);
 
             logger.info(`Access token refreshed`);
             res.json(
-              apiResponse(201, "Access token Refreshed", true, [
-                accessToken,
-                refreshToken,
-              ])
+              apiResponse(201, "Access token Refreshed", true, [jwtTokens])
             );
           }
         );
