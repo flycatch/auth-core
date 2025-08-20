@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import ms from "ms"; // Optional dep for parsing '5m' to ms; add if not present
 import { Config } from "../interfaces/config.interface";
-import createLogger from "../lib/wintson.logger";
+import { User } from "../interfaces/user.interface";
 
 // Pure: Generate random OTP
 const generateOtp = (length: number): string =>
@@ -12,23 +12,20 @@ const generateOtp = (length: number): string =>
 
 // Higher-order: Create configured handlers
 
-export const create2faHandlers = (appConfig: Config) => {
-  const config = appConfig["twoFA"];
-  const logger = createLogger(appConfig);
+export default (config: Config["twoFA"]) => {
   if (!config) {
     throw new Error("No configuration added for 2FA");
   }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const isEnabledForUser = (user: any): boolean =>
-    config.enabled && user.is2faEnabled;
 
   // Impure (side effects): Initiate 2FA flow
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const initiate2fa = async (user: any): Promise<void> => {
-    if (!isEnabledForUser(user)) return;
-
+  const initiate2fa = async (user: User): Promise<void> => {
     const otp = generateOtp(config.otpLength ? config.otpLength : 6);
-    const expiresInMs = ms(config.otpExpiresIn ? config.otpExpiresIn : 5000);
+    const rawExpiresIn = config.otpExpiresIn ?? "5m";
+
+    const expiresInMs =
+      typeof rawExpiresIn === "number"
+        ? rawExpiresIn
+        : (ms(rawExpiresIn) as number);
 
     if (config.onOtpGenerated) await config.onOtpGenerated(otp, user);
 
@@ -38,24 +35,20 @@ export const create2faHandlers = (appConfig: Config) => {
 
     await config.storeOtp(user.id, otp, expiresInMs);
     if (!config.transport) {
-      logger.warn(
-        "No transport had ben configured to send OTP, check your storage for the generated 2fa otp"
+      throw new TransportNotFoundError(
+        "No transport had been configured to send OTP, check your storage for the generated 2fa otp"
       );
-      return;
     }
     try {
       await config.transport(otp, user);
       if (config.onOtpSent) await config.onOtpSent(user);
     } catch (err) {
-      throw new TransportError(`Failed to send OTP: ${err}`);
+      throw new Error(`Failed to send OTP: ${err}`);
     }
   };
 
   // Impure: Verify OTP
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const verifyOtp = async (user: any, inputOtp: string): Promise<boolean> => {
-    if (!isEnabledForUser(user)) throw new Error("2FA not enabled");
-
+  const verifyOtp = async (user: User, inputOtp: string): Promise<boolean> => {
     if (!config.getStoredOtp) {
       throw new Error("Need to config getStoredOtp logic for otp verification");
     }
@@ -84,4 +77,4 @@ export const create2faHandlers = (appConfig: Config) => {
 // Custom errors for handling
 export class OtpExpiredError extends Error {}
 export class InvalidOtpError extends Error {}
-export class TransportError extends Error {}
+export class TransportNotFoundError extends Error {}

@@ -1,4 +1,6 @@
-interface SessionConfig {
+import { User } from "./user.interface";
+
+export interface SessionConfig {
   enabled: boolean;
   secret?: string;
   prefix?: string;
@@ -10,39 +12,41 @@ interface SessionConfig {
   };
 }
 
-interface JwtConfig {
+type expiresIn = `${number}${"s" | "m" | "h" | "d" | "w" | "y"}` | number;
+export interface JwtConfig {
   enabled: boolean;
   secret?: string;
-  expiresIn?: `${number}${"s" | "m" | "h" | "d" | "w" | "y"}` | number;
+  expiresIn?: expiresIn;
   refresh?: boolean;
+  refreshExpiresIn?: expiresIn;
   prefix?: string;
 }
 
-interface GoogleConfig {
+export interface GoogleConfig {
   enabled: boolean;
   clientID: string;
   clientSecret: string;
   prefix?: string;
 }
 
-interface TwoFAConfig {
+export interface TwoFAConfig {
   enabled: boolean;
   otpLength?: number;
-  otpExpiresIn?: number;
+  otpExpiresIn?: expiresIn;
   prefix?: string;
+  transport?: (otp: string, user: User) => Promise<void>;
+  storeOtp?: (
+    userId: string | number,
+    otp: string,
+    expiresInMs: number
+  ) => Promise<void>;
+  getStoredOtp?: (userId: string | number) => Promise<string | null>;
+  clearOtp?: (userId: string | number) => Promise<void>;
+  onOtpGenerated?: (otp: string, user: User) => Promise<void>;
+  onOtpSent?: (user: User) => Promise<void>;
+  onVerifySuccess?: (user: User) => Promise<void>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  transport?: (otp: string, user: any) => Promise<void>;
-  storeOtp?: (userId: string, otp: string, expiresInMs: string) => Promise<void>;
-  getStoredOtp?: (userId: string) => Promise<string | null>;
-  clearOtp?: (userId: string) => Promise<void>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  onOtpGenerated?: (otp: string, user: any) => Promise<void>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  onOtpSent?: (user: any) => Promise<void>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  onVerifySuccess?: (user: any) => Promise<void>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  onVerifyFail?: (user: any, error: any) => Promise<void>;
+  onVerifyFail?: (user: User, error: any) => Promise<void>;
 }
 
 export interface Config {
@@ -51,8 +55,7 @@ export interface Config {
   google?: GoogleConfig;
   twoFA?: TwoFAConfig;
   userService: {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    loadUser: (email: string) => Promise<any>;
+    loadUser: (email: string) => Promise<User | null | undefined>;
   };
   passwordChecker: (
     inputPassword: string,

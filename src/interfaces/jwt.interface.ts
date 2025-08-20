@@ -5,3 +5,8 @@ export interface JWTPayload extends JwtPayload {
   username: string;
   type: "refresh" | "access";
 }
+
+export interface JwtTokens {
+  accessToken: string;
+  refreshToken?: string;
+}

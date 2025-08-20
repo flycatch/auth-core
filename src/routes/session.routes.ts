@@ -23,7 +23,7 @@ export default (router: Router, config: Config) => {
       const user = await config.userService.loadUser(username);
       if (!user) {
         logger.warn(`Login failed: User not found (username ${username})`);
-        res
+        return res
           .status(401)
           .json(apiResponse(401, "Invalid username or password", false));
       }
