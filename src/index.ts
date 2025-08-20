@@ -4,12 +4,11 @@ import express from "express";
 import createLogger from "./lib/wintson.logger";
 import jwtRoutes from "./routes/jwt.routes";
 import sessionRoutes from "./routes/session.routes";
-import setupGoogleRoutes from "./routes/setup-google-oath.routes";
-import setupSession from "./config/Session.config";
-import setupGoogleOath from "./config/GoogleOath.config";
+import setupGoogleRoutes from "./routes/google.routes";
+import setupSession from "./config/session.config";
+import setupGoogleOath from "./config/google.config";
 import jwtMiddleware from "./middlewares/jwt.middleware";
 import sessionMiddleware from "./middlewares/session.middleware";
-import googleAuthMiddleware from "./middlewares/googleAuth.middleware";
 
 // Configuration storage
 let configurations: Config = {} as Config;
@@ -48,7 +47,7 @@ function verify(
   permission?: string
 ): (req: Request, res: Response, next: NextFunction) => void {
   return (req: Request, res: Response, next: NextFunction) => {
-    const { jwt, session, google } = configurations;
+    const { jwt, session } = configurations;
     const logger = createLogger(configurations);
 
     //  Ensure user has permissions
@@ -81,20 +80,10 @@ function verify(
         }
         checkPermission(req.user);
       });
-    } else if (google && google.enabled) {
-      return googleAuthMiddleware(configurations)(req, res, (err) => {
-        if (err) {
-          logger.warn("Google OAuth verification failed", {
-            error: err.message,
-          });
-          return res
-            .status(403)
-            .json({ error: "Google OAuth token is invalid or expired" });
-        }
-        checkPermission(req.user);
-      });
     } else {
-      logger.warn("Authentication is not configured");
+      logger.warn(
+        "Either JWT or session should configured to use verify middleware"
+      );
       return res.status(500).json({ error: "Authentication not configured" });
     }
   };
