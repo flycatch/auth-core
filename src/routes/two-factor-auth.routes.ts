@@ -116,7 +116,7 @@ export default (router: Router, config: Config) => {
       } catch (error: any) {
         if (error instanceof OtpExpiredError || InvalidOtpError) {
           logger.warn(error.message);
-          return res.status(400).json({ error: error.message });
+          return res.status(401).json({ error: error.message });
         }
         logger.error(error.message);
         res.status(500).json({ error: error.message });
