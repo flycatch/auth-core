@@ -47,7 +47,7 @@ export default (router: Router, config: Config) => {
       // Store user details in session
       req.session.user = payload;
 
-      logger.info(`session Login successfull `);
+      logger.info(`session Login successful `);
       res.json(apiResponse(201, "Login Successful", true, [payload]));
     } catch (error) {
       logger.error(`session Login error for username ${username} `, error);
