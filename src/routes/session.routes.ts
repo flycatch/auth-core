@@ -18,7 +18,7 @@ export default (router: Router, config: Config) => {
   router.post(`${prefix}/login`, async (req: Request, res: Response) => {
     const { username, password } = req.body;
 
-    logger.info(` session login attempt `);
+    logger.info(`Session login attempt `);
     try {
       const user = await config.userService.loadUser(username);
       if (!user) {
@@ -47,8 +47,8 @@ export default (router: Router, config: Config) => {
       // Store user details in session
       req.session.user = payload;
 
-      logger.info(`session Login successfull `);
-      res.json(apiResponse(201, "Login Successfull", true, [payload]));
+      logger.info(`session Login successful `);
+      res.json(apiResponse(201, "Login Successful", true, [payload]));
     } catch (error) {
       logger.error(`session Login error for username ${username} `, error);
       res.status(500).json(apiResponse(500, "Internal server error", false));

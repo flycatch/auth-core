@@ -126,16 +126,14 @@ google: {
   enabled: false,
   clientID: "GOOGLE_CLIENT_ID",
   clientSecret: "GOOGLE_CLIENT_SECRET",
-  callbackURL: "/auth/google/callback",
-  secret: "google_secret",
+  prefix:"/auth/google"
 },
 ```
 
 - **enabled**: Enables Google OAuth authentication.
 - **clientID**: The Google OAuth Client ID.
 - **clientSecret**: The Google OAuth Client Secret.
-- **callbackURL**: The callback URL after Google authentication.
-- **secret**: Secret key for verifying Google OAuth JWT tokens.
+- **prefix**: Defines the route prefix for google oauth authentication endpoints.
 
 ### **User Service Integration**
 
@@ -197,7 +195,14 @@ The logs option controls the level of logging displayed during authentication.
 3. **Google OAuth Authentication**
    - Users log in via Google.
    - The system fetches the user’s profile information.
-   - The user receives a JWT token for subsequent requests.
+   - If JWT is enabled in the configuration:
+     - The user receives a JWT token for subsequent requests.
+   - Else if Session is enabled:
+     - A session is created and stored on the server.
+     - Sessions persist across requests until they expire.
+     - Middleware validates the session before granting access.
+   - Else if neither JWT nor Session is configured:
+     - The system throws a **500 Internal Server Error**.
 
 ### `auth.config(config: Config): Router`
 
@@ -209,28 +214,53 @@ Middleware to verify user authentication based on the enabled strategy (JWT, ses
 
 ## API Endpoints
 
+If a **prefix** is provided in the configuration, all authentication endpoints will be available at
+`{prefix}/...`.
+Otherwise, they fall back to the default paths listed below.
+
 ### **Login with JWT**
 
+- **With prefix:** `{prefix}/login`
+- **Without prefix:** `/auth/jwt/login`
+
 ```http
-POST /auth/jwt/login
+POST {prefix}/login
 ```
 
 ### **Refresh JWT Token**
 
+- **With prefix:** {prefix}/refresh
+- **Without prefix:** /auth/jwt/refresh
+
 ```http
-POST /auth/jwt/refresh
+POST {prefix}/refresh
+```
+
+### **Login with Session**
+
+- **With prefix:** {prefix}/login
+- **Without prefix:** /auth/session/login
+
+```http
+POST {prefix}/login
 ```
 
 ### **Google OAuth Login**
 
+- **With prefix:** {prefix}/login
+- **Without prefix:** /auth/google/login
+
 ```http
-GET /auth/google/login
+POST {prefix}/login
 ```
 
 ### **Google OAuth Callback**
 
+- **With prefix:** {prefix}/callback
+- **Without prefix:** /auth/google/callback
+
 ```http
-GET /auth/google/callback
+POST {prefix}/callback
 ```
 
 ## Contributing

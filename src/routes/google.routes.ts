@@ -81,7 +81,7 @@ export default (router: Router, config: Config) => {
           const refreshToken = await createRefreshToken(req.user);
           logger.info("User successfully logged in with Google OAuth");
           res.json(
-            apiResponse(201, "Google Oath Successfull", true, [
+            apiResponse(201, "Google OAuth Successful,", true, [
               accessToken,
               refreshToken,
             ])
@@ -91,9 +91,9 @@ export default (router: Router, config: Config) => {
           // Store user details in session
           req.session.user = payload;
 
-          logger.info(`session Login successfull `);
+          logger.info(`session Login successful `);
           return res.json(
-            apiResponse(201, "Login Successfull", true, [payload])
+            apiResponse(201, "Login Successful", true, [payload])
           );
         } else {
           logger.error(
