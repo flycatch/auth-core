@@ -28,7 +28,7 @@ export default (router: Router, config: Config) => {
         if (!email) {
           return res
             .status(400)
-            .json({ message: "email required on request payload" });
+            .json({ message: "Email required on request payload" });
         }
 
         const user = await config.userService.loadUser(email);
@@ -93,16 +93,16 @@ export default (router: Router, config: Config) => {
 
           logger.info(`JWT Login Succesful`);
           res.json(
-            apiResponse(201, "Two Factor Oath Successfull", true, [tokens])
+            apiResponse(201, "Two Factor Oath Successful", true, [tokens])
           );
         } else if (config.session?.enabled) {
           const payload = createSessionPayload(user);
           // Store user details in session
           req.session.user = payload;
 
-          logger.info(`session Login successfull `);
+          logger.info(`Session Login successful `);
           return res.json(
-            apiResponse(201, "Login Successfull", true, [payload])
+            apiResponse(201, "Login Successful", true, [payload])
           );
         } else {
           logger.error(
