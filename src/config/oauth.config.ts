@@ -1,6 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
+import { Strategy as FacebookStrategy } from "passport-facebook";
+// import { Strategy as GitHubStrategy } from "passport-github2";
+// import { Strategy as TwitterStrategy } from "passport-twitter";
 import { Config } from "../interfaces/config.interface";
 import createLogger from "../lib/wintson.logger";
 
@@ -23,6 +26,24 @@ export default (config: Config): void => {
           scope: providers.google.scope || ["profile", "email"],
         },
         createVerifyCallback("google", config, logger)
+      )
+    );
+  }
+
+  // Facebook Strategy
+  if (providers.facebook) {
+    passport.use(
+      new FacebookStrategy(
+        {
+          clientID: providers.facebook.clientID,
+          clientSecret: providers.facebook.clientSecret,
+          callbackURL:
+            providers.facebook.callbackURL ||
+            `${config.oauth.prefix || "/auth"}/facebook/callback`,
+          scope: providers.facebook.scope || ["email"],
+          profileFields: ["id", "emails", "name"],
+        },
+        createVerifyCallback("facebook", config, logger)
       )
     );
   }

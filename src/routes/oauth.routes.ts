@@ -27,6 +27,22 @@ export default (router: Router, config: Config) => {
       createCallbackHandler("google", config, logger)
     );
   }
+
+  // Facebook routes
+  if (config.oauth.providers.facebook) {
+    router.get(
+      `${basePrefix}/facebook`,
+      passport.authenticate("facebook", { scope: ["email"] })
+    );
+
+    router.get(
+      `${basePrefix}/facebook/callback`,
+      passport.authenticate("facebook", { session: false }),
+      createCallbackHandler("facebook", config, logger)
+    );
+  }
+
+  // Add other providers similarly...
 };
 
 const createCallbackHandler = (
