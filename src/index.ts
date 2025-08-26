@@ -7,6 +7,8 @@ import sessionRoutes from "./routes/session.routes";
 import setupGoogleRoutes from "./routes/google.routes";
 import setupSession from "./config/session.config";
 import setupGoogleOath from "./config/google.config";
+import setupOAuth from "./config/oauth.config";
+import oauthRoutes from "./routes/oauth.routes";
 import jwtMiddleware from "./middlewares/jwt.middleware";
 import sessionMiddleware from "./middlewares/session.middleware";
 import twoFactorAuthRoutes from "./routes/two-factor-auth.routes";
@@ -38,6 +40,12 @@ function config(config: Config): Router {
   if (config.google && config.google.enabled) {
     setupGoogleOath(config);
     setupGoogleRoutes(router, config);
+  }
+
+  // Set up OAuth if enabled
+  if (config.oauth?.enabled) {
+    setupOAuth(configurations);
+    oauthRoutes(router, config);
   }
 
   if (config.twoFA && config.twoFA.enabled) {

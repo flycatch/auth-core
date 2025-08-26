@@ -49,11 +49,27 @@ export interface TwoFAConfig {
   onVerifyFail?: (user: User, error: any) => Promise<void>;
 }
 
+type OAuth2Providers = "google" | "facebook" | "twitter" | "github";
+
+export interface OAuth2Config {
+  enabled: boolean;
+  providers: {
+    [key in OAuth2Providers]?: {
+      clientID: string;
+      clientSecret: string;
+      callbackURL?: string;
+      scope?: string[];
+    };
+  };
+  prefix?: string;
+}
+
 export interface Config {
   jwt?: JwtConfig;
   session?: SessionConfig;
   google?: GoogleConfig;
   twoFA?: TwoFAConfig;
+  oauth?: OAuth2Config;
   userService: {
     loadUser: (email: string) => Promise<User | null | undefined>;
   };

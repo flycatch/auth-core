@@ -1,0 +1,68 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import passport from "passport";
+import { Strategy as GoogleStrategy } from "passport-google-oauth20";
+import { Config } from "../interfaces/config.interface";
+import createLogger from "../lib/wintson.logger";
+
+export default (config: Config): void => {
+  if (!config.oauth?.enabled) return;
+
+  const logger = createLogger(config);
+  const providers = config.oauth.providers;
+
+  // Google Strategy
+  if (providers.google) {
+    passport.use(
+      new GoogleStrategy(
+        {
+          clientID: providers.google.clientID,
+          clientSecret: providers.google.clientSecret,
+          callbackURL:
+            providers.google.callbackURL ||
+            `${config.oauth.prefix || "/auth"}/google/callback`,
+          scope: providers.google.scope || ["profile", "email"],
+        },
+        createVerifyCallback("google", config, logger)
+      )
+    );
+  }
+
+  // Add other providers similarly...
+};
+
+const createVerifyCallback = (
+  provider: string,
+  config: Config,
+  logger: any
+) => {
+  return async (
+    accessToken: string,
+    refreshToken: string,
+    profile: any,
+    done: (error: any, user?: any, info?: any) => void
+  ) => {
+    try {
+      logger.info(`${provider} OAuth strategy triggered`);
+
+      const email = profile.emails?.[0]?.value;
+      if (!email) {
+        logger.warn("Email not found in profile");
+        return done(null, false, { message: "Email not provided" });
+      }
+
+      const user = await config.userService.loadUser(email);
+      if (!user) {
+        logger.warn(`User not found for email: ${email}`);
+        return done(null, false, { message: "User not authorized" });
+      }
+
+      logger.info("User successfully authenticated");
+      return done(null, user);
+    } catch (err: any) {
+      logger.error(`Error in ${provider} OAuth strategy`, {
+        error: err.message,
+      });
+      return done(err, null);
+    }
+  };
+};
