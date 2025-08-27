@@ -2,7 +2,7 @@
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { Strategy as FacebookStrategy } from "passport-facebook";
-// import { Strategy as GitHubStrategy } from "passport-github2";
+import { Strategy as GitHubStrategy } from "passport-github2";
 // import { Strategy as TwitterStrategy } from "passport-twitter";
 import { Config } from "../interfaces/config.interface";
 import createLogger from "../lib/wintson.logger";
@@ -44,6 +44,22 @@ export default (config: Config): void => {
           profileFields: ["id", "emails", "name"],
         },
         createVerifyCallback("facebook", config, logger)
+      )
+    );
+  }
+  // Github Strategy
+  if (providers.github) {
+    passport.use(
+      new GitHubStrategy(
+        {
+          clientID: providers.github.clientID,
+          clientSecret: providers.github.clientSecret,
+          callbackURL:
+            providers.github.callbackURL ||
+            `${config.oauth.prefix || "/auth"}/github/callback`,
+          scope: providers.github.scope || ["email"],
+        },
+        createVerifyCallback("github", config, logger)
       )
     );
   }

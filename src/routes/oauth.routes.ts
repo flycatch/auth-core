@@ -42,6 +42,20 @@ export default (router: Router, config: Config) => {
     );
   }
 
+  // Github Routes
+  if (config.oauth.providers.github) {
+    router.get(
+      `${basePrefix}/github`,
+      passport.authenticate("github", { scope: ["email"] })
+    );
+
+    router.get(
+      `${basePrefix}/github/callback`,
+      passport.authenticate("github", { session: false }),
+      createCallbackHandler("github", config, logger)
+    );
+  }
+
   // Add other providers similarly...
 };
 
