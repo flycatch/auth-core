@@ -12,6 +12,7 @@ import oauthRoutes from "./routes/oauth.routes";
 import jwtMiddleware from "./middlewares/jwt.middleware";
 import sessionMiddleware from "./middlewares/session.middleware";
 import twoFactorAuthRoutes from "./routes/two-factor-auth.routes";
+import passport from "passport";
 
 // Configuration storage
 let configurations: Config = {} as Config;
@@ -19,9 +20,8 @@ let configurations: Config = {} as Config;
 // Function to initialize configurations and set up routes
 function config(config: Config): Router {
   configurations = config;
-
   const logger = createLogger(config);
-  logger.info("Info logs enabled"); // Will be shown only if logs: true
+  logger.info("Info logs enabled");
 
   const router = express.Router();
 
@@ -42,8 +42,9 @@ function config(config: Config): Router {
     setupGoogleRoutes(router, config);
   }
 
-  // Set up OAuth if enabled
+  // Set up OAuth if enabled - SETUP BEFORE ROUTES
   if (config.oauth?.enabled) {
+    router.use(passport.initialize());
     setupOAuth(configurations);
     oauthRoutes(router, config);
   }

@@ -3,7 +3,7 @@ import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { Strategy as FacebookStrategy } from "passport-facebook";
 import { Strategy as GitHubStrategy } from "passport-github2";
-// import { Strategy as TwitterStrategy } from "passport-twitter";
+import { Strategy as TwitterStrategy } from "passport-twitter";
 import { Config } from "../interfaces/config.interface";
 import createLogger from "../lib/wintson.logger";
 
@@ -47,6 +47,7 @@ export default (config: Config): void => {
       )
     );
   }
+
   // Github Strategy
   if (providers.github) {
     passport.use(
@@ -64,9 +65,34 @@ export default (config: Config): void => {
     );
   }
 
-  // Add other providers similarly...
+  // Twitter Strategy - FIXED
+  if (providers.twitter) {
+    const twitterCallbackURL =
+      providers.twitter.callbackURL ||
+      `${config.oauth.baseURL}${config.oauth.prefix}/twitter/callback`;
+    logger.info("Twitter OAuth Callback URL:", twitterCallbackURL);
+    logger.info(
+      "Twitter Consumer Key:",
+      providers.twitter.clientID?.substring(0, 10) + "..."
+    );
+
+    passport.use(
+      new TwitterStrategy(
+        {
+          consumerKey: providers.twitter.clientID,
+          consumerSecret: providers.twitter.clientSecret,
+          callbackURL: twitterCallbackURL,
+          includeEmail: true,
+          userProfileURL:
+            "https://api.twitter.com/1.1/account/verify_credentials.json?include_email=true",
+        },
+        createTwitterVerifyCallback("twitter", config, logger)
+      )
+    );
+  }
 };
 
+// Standard verify callback for OAuth 2.0 providers
 const createVerifyCallback = (
   provider: string,
   config: Config,
@@ -98,6 +124,58 @@ const createVerifyCallback = (
     } catch (err: any) {
       logger.error(`Error in ${provider} OAuth strategy`, {
         error: err.message,
+      });
+      return done(err, null);
+    }
+  };
+};
+
+// Special verify callback for Twitter (OAuth 1.0a has different signature)
+const createTwitterVerifyCallback = (
+  provider: string,
+  config: Config,
+  logger: any
+) => {
+  return async (
+    token: string,
+    tokenSecret: string,
+    profile: any,
+    done: (error: any, user?: any, info?: any) => void
+  ) => {
+    try {
+      logger.info(`${provider} OAuth strategy triggered`, {
+        profileId: profile.id,
+        username: profile.username,
+        hasEmails: !!profile.emails,
+        emailCount: profile.emails?.length || 0,
+      });
+
+      const email = profile.emails?.[0]?.value;
+      if (!email) {
+        logger.warn(`Email not found in ${provider} profile`, {
+          profileId: profile.id,
+          username: profile.username,
+          profileData: JSON.stringify(profile, null, 2),
+        });
+        return done(null, false, {
+          message:
+            "Email not provided by Twitter. Please ensure your Twitter app has email permissions.",
+        });
+      }
+
+      logger.info(`Attempting to load user with email: ${email}`);
+      const user = await config.userService.loadUser(email);
+      if (!user) {
+        logger.warn(`User not found for email: ${email}`);
+        return done(null, false, { message: "User not authorized" });
+      }
+
+      logger.info(`User successfully authenticated: ${email}`);
+      return done(null, user);
+    } catch (err: any) {
+      logger.error(`Error in ${provider} OAuth strategy`, {
+        error: err.message,
+        stack: err.stack,
       });
       return done(err, null);
     }

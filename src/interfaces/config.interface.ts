@@ -53,6 +53,7 @@ type OAuth2Providers = "google" | "facebook" | "twitter" | "github";
 
 export interface OAuth2Config {
   enabled: boolean;
+  baseURL?: string;
   providers: {
     [key in OAuth2Providers]?: {
       clientID: string;

@@ -56,7 +56,44 @@ export default (router: Router, config: Config) => {
     );
   }
 
-  // Add other providers similarly...
+  // Twitter Routes - FIXED
+  if (config.oauth.providers.twitter) {
+    router.get(
+      `${basePrefix}/twitter`,
+      (req: Request, res: Response, next) => {
+        logger.info("Initiating Twitter OAuth2 flow");
+        next();
+      },
+      passport.authenticate("twitter", {
+        scope: ["tweet.read", "users.read", "offline.access"],
+      })
+    );
+
+    router.get(
+      `${basePrefix}/twitter/callback`,
+      (req: Request, res: Response, next) => {
+        logger.info("Twitter OAuth2 callback received", {
+          query: req.query,
+          url: req.url,
+        });
+        next();
+      },
+      passport.authenticate("twitter", {
+        session: false,
+        failureRedirect: "/auth/error",
+      }),
+      createCallbackHandler("twitter", config, logger)
+    );
+  }
+
+  // Error route for failed OAuth
+  router.get("/auth/error", (req: Request, res: Response) => {
+    logger.error("OAuth authentication failed");
+    res.status(400).json({
+      error: "Authentication failed",
+      message: "OAuth authentication was unsuccessful",
+    });
+  });
 };
 
 const createCallbackHandler = (
