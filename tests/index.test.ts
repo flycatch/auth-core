@@ -11,7 +11,10 @@ import setupGoogleOath from "../src/config/google.config";
 import jwtMiddleware from "../src/middlewares/jwt.middleware";
 import sessionMiddleware from "../src/middlewares/session.middleware";
 import twoFactorAuthRoutes from "../src/routes/two-factor-auth.routes";
+import setupOauth from "../src/config/oauth.config";
+import oauthRoutes from "../src/routes/oauth.routes";
 import indexModule from "../src/index";
+import { User } from "../src/interfaces/user.interface";
 
 jest.mock("../src/lib/wintson.logger", () => () => ({
   info: jest.fn(),
@@ -24,6 +27,8 @@ jest.mock("../src/routes/google.routes");
 jest.mock("../src/routes/two-factor-auth.routes");
 jest.mock("../src/config/session.config");
 jest.mock("../src/config/google.config");
+jest.mock("../src/config/oauth.config");
+jest.mock("../src/routes/oauth.routes");
 jest.mock("../src/middlewares/jwt.middleware", () =>
   jest.fn(() => (req: any, res: any, next: any) => next())
 );
@@ -60,6 +65,30 @@ describe("index.ts config function", () => {
     const config: Config = { twoFA: { enabled: true } } as any;
     const router = indexModule.config(config);
     expect(twoFactorAuthRoutes).toHaveBeenCalled();
+  });
+
+  it("should setup  OAuth routes if it's enabled", () => {
+    const config: Config = {
+      oauth: {
+        enabled: true,
+        providers: {},
+      },
+      userService: {
+        loadUser: function (email: string): Promise<User | null | undefined> {
+          throw new Error("Function not implemented.");
+        },
+      },
+      passwordChecker: function (
+        inputPassword: string,
+        storedPassword: string
+      ): Promise<boolean> {
+        throw new Error("Function not implemented.");
+      },
+      logs: false,
+    };
+    const router = indexModule.config(config);
+    expect(setupOauth).toHaveBeenCalled();
+    expect(oauthRoutes).toHaveBeenCalled();
   });
 });
 
