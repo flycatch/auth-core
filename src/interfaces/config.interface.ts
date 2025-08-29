@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { User } from "./user.interface";
 
 export interface SessionConfig {
@@ -45,24 +46,50 @@ export interface TwoFAConfig {
   onOtpGenerated?: (otp: string, user: User) => Promise<void>;
   onOtpSent?: (user: User) => Promise<void>;
   onVerifySuccess?: (user: User) => Promise<void>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onVerifyFail?: (user: User, error: any) => Promise<void>;
 }
 
-type OAuth2Providers = "google" | "facebook" | "twitter" | "github";
+// OAuth 2.0 Configuration Interface (OAuth 2.0 only)
+export type OAuth2Providers = "google" | "facebook" | "github" | "twitter";
+
+export interface BaseProviderConfig {
+  clientID: string;
+  clientSecret: string;
+  callbackURL?: string;
+  scope?: string[];
+}
+
+export interface CustomProviderConfig extends BaseProviderConfig {
+  // Strategy class or constructor function for OAuth 2.0
+  strategy: any;
+  // Custom configuration specific to the provider
+  customConfig?: Record<string, any>;
+  // Custom profile field mappings
+  profileMapping?: {
+    email?: string; // path to email in profile
+    id?: string; // path to user id in profile
+    name?: string; // path to name in profile
+  };
+  // Custom verify callback for OAuth 2.0
+  customVerifyCallback?: (
+    accessToken: string,
+    refreshToken: string,
+    profile: any,
+    done: (error: any, user?: any, info?: any) => void
+  ) => void;
+}
 
 export interface OAuth2Config {
   enabled: boolean;
   baseURL?: string;
-  providers: {
-    [key in OAuth2Providers]?: {
-      clientID: string;
-      clientSecret: string;
-      callbackURL?: string;
-      scope?: string[];
-    };
-  };
   prefix?: string;
+  providers: {
+    [key in OAuth2Providers]?: BaseProviderConfig;
+  };
+  // Global custom providers configuration
+  customProviders?: {
+    [providerName: string]: CustomProviderConfig;
+  };
 }
 
 export interface Config {

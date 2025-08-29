@@ -56,7 +56,7 @@ export default (router: Router, config: Config) => {
     );
   }
 
-  // Twitter Routes - FIXED
+  // Twitter Routes
   if (config.oauth.providers.twitter) {
     router.get(
       `${basePrefix}/twitter`,
@@ -85,6 +85,9 @@ export default (router: Router, config: Config) => {
       createCallbackHandler("twitter", config, logger)
     );
   }
+
+  // Routes for Custum Oauth Startegies
+  setupCustomProviderRoutes(router, config, logger, basePrefix);
 
   // Error route for failed OAuth
   router.get("/auth/error", (req: Request, res: Response) => {
@@ -136,4 +139,58 @@ const createCallbackHandler = (
       res.status(500).json(apiResponse(500, "Internal server error", false));
     }
   };
+};
+
+// Setup routes for custom providers
+const setupCustomProviderRoutes = (
+  router: Router,
+  config: Config,
+  logger: any,
+  basePrefix: string
+) => {
+  if (!config.oauth?.customProviders) return;
+
+  Object.entries(config.oauth.customProviders).forEach(
+    ([providerName, providerConfig]) => {
+      try {
+        logger.info(`Setting up routes for custom provider: ${providerName}`);
+
+        // Auth initiation route
+        router.get(
+          `${basePrefix}/${providerName}`,
+          (req: Request, res: Response, next) => {
+            logger.info(`Initiating ${providerName} OAuth flow`);
+            next();
+          },
+          passport.authenticate(providerName, {
+            scope: providerConfig.scope || ["profile", "email"],
+          })
+        );
+
+        // Auth callback route
+        router.get(
+          `${basePrefix}/${providerName}/callback`,
+          (req: Request, res: Response, next) => {
+            logger.info(`${providerName} OAuth callback received`, {
+              query: req.query,
+              url: req.url,
+            });
+            next();
+          },
+          passport.authenticate(providerName, {
+            session: false,
+            failureRedirect: "/auth/error",
+          }),
+          createCallbackHandler(providerName, config, logger)
+        );
+
+        logger.info(`Custom provider ${providerName} routes setup complete`);
+      } catch (error) {
+        logger.error(
+          `Failed to setup routes for custom provider ${providerName}:`,
+          error
+        );
+      }
+    }
+  );
 };

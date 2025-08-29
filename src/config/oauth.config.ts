@@ -4,7 +4,7 @@ import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { Strategy as FacebookStrategy } from "passport-facebook";
 import { Strategy as GitHubStrategy } from "passport-github2";
 import { Strategy as TwitterStrategy } from "passport-twitter";
-import { Config } from "../interfaces/config.interface";
+import { Config, CustomProviderConfig } from "../interfaces/config.interface";
 import createLogger from "../lib/wintson.logger";
 
 export default (config: Config): void => {
@@ -65,7 +65,7 @@ export default (config: Config): void => {
     );
   }
 
-  // Twitter Strategy - FIXED
+  // Twitter Strategy
   if (providers.twitter) {
     const twitterCallbackURL =
       providers.twitter.callbackURL ||
@@ -90,6 +90,9 @@ export default (config: Config): void => {
       )
     );
   }
+
+  // Custom Provider Strategy
+  setupCustomProviders(config, logger);
 };
 
 // Standard verify callback for OAuth 2.0 providers
@@ -180,4 +183,127 @@ const createTwitterVerifyCallback = (
       return done(err, null);
     }
   };
+};
+
+const setupCustomProviders = (config: Config, logger: any) => {
+  if (!config.oauth?.customProviders) return;
+
+  Object.entries(config.oauth.customProviders).forEach(
+    ([providerName, providerConfig]) => {
+      try {
+        setupCustomProvider(providerName, providerConfig, config, logger);
+      } catch (error) {
+        logger.error(`Failed to setup custom provider ${providerName}:`, error);
+      }
+    }
+  );
+};
+
+// Setup individual custom OAuth 2.0 provider
+const setupCustomProvider = (
+  providerName: string,
+  providerConfig: CustomProviderConfig,
+  config: Config,
+  logger: any
+) => {
+  if (!config.oauth) {
+    throw new Error();
+  }
+  logger.info(`Setting up custom OAuth 2.0 provider: ${providerName}`);
+
+  // Create strategy configuration
+  const strategyConfig = {
+    clientID: providerConfig.clientID,
+    clientSecret: providerConfig.clientSecret,
+    callbackURL:
+      providerConfig.callbackURL ||
+      `${config.oauth.prefix || "/auth"}/${providerName}/callback`,
+    scope: providerConfig.scope || ["profile", "email"],
+    ...providerConfig.customConfig,
+  };
+
+  // Use custom verify callback or create default one
+  const verifyCallback =
+    providerConfig.customVerifyCallback ||
+    createCustomVerifyCallback(providerName, providerConfig, config, logger);
+
+  // Create and register strategy
+  const StrategyClass = providerConfig.strategy;
+  const strategy = new StrategyClass(strategyConfig, verifyCallback);
+
+  passport.use(providerName, strategy);
+  logger.info(`Custom OAuth 2.0 provider ${providerName} setup complete`);
+};
+
+// Create custom verify callback for OAuth 2.0
+const createCustomVerifyCallback = (
+  providerName: string,
+  providerConfig: CustomProviderConfig,
+  config: Config,
+  logger: any
+) => {
+  return async (
+    accessToken: string,
+    refreshToken: string,
+    profile: any,
+    done: (error: any, user?: any, info?: any) => void
+  ) => {
+    try {
+      logger.info(`${providerName} OAuth 2.0 strategy triggered`);
+
+      // Extract email using custom mapping or default
+      const emailPath =
+        providerConfig.profileMapping?.email || "emails[0].value";
+      const email = getNestedValue(profile, emailPath);
+
+      if (!email) {
+        logger.warn(`Email not found in ${providerName} profile`, {
+          profile: JSON.stringify(profile, null, 2),
+        });
+        return done(null, false, {
+          message: `Email not provided by ${providerName}. Please ensure the correct scopes are configured.`,
+        });
+      }
+
+      logger.info(
+        `Attempting to load user with email: ${email} from ${providerName}`
+      );
+      const user = await config.userService.loadUser(email);
+
+      if (!user) {
+        logger.warn(`User not found for email: ${email} from ${providerName}`);
+        return done(null, false, { message: "User not authorized" });
+      }
+
+      logger.info(
+        `User successfully authenticated via ${providerName}: ${email}`
+      );
+      return done(null, user);
+    } catch (err: any) {
+      logger.error(`Error in ${providerName} OAuth 2.0 strategy`, {
+        error: err.message,
+        stack: err.stack,
+      });
+      return done(err, null);
+    }
+  };
+};
+
+// Utility function to get nested values from objects
+const getNestedValue = (obj: any, path: string): any => {
+  if (!path) return undefined;
+
+  try {
+    // Handle array notation like 'emails[0].value'
+    const normalizedPath = path.replace(/\[(\d+)\]/g, ".$1");
+
+    return normalizedPath.split(".").reduce((current, key) => {
+      if (current && typeof current === "object") {
+        return current[key];
+      }
+      return undefined;
+    }, obj);
+  } catch {
+    return undefined;
+  }
 };
