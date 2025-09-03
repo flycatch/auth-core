@@ -23,13 +23,6 @@ export interface JwtConfig {
   prefix?: string;
 }
 
-export interface GoogleConfig {
-  enabled: boolean;
-  clientID: string;
-  clientSecret: string;
-  prefix?: string;
-}
-
 export interface TwoFAConfig {
   enabled: boolean;
   otpLength?: number;
@@ -95,7 +88,6 @@ export interface OAuth2Config {
 export interface Config {
   jwt?: JwtConfig;
   session?: SessionConfig;
-  google?: GoogleConfig;
   twoFA?: TwoFAConfig;
   oauth?: OAuth2Config;
   userService: {

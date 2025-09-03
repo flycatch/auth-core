@@ -5,9 +5,7 @@ import { Config } from "../src/interfaces/config.interface";
 import createLogger from "../src/lib/wintson.logger";
 import jwtRoutes from "../src/routes/jwt.routes";
 import sessionRoutes from "../src/routes/session.routes";
-import setupGoogleRoutes from "../src/routes/google.routes";
 import setupSession from "../src/config/session.config";
-import setupGoogleOath from "../src/config/google.config";
 import jwtMiddleware from "../src/middlewares/jwt.middleware";
 import sessionMiddleware from "../src/middlewares/session.middleware";
 import twoFactorAuthRoutes from "../src/routes/two-factor-auth.routes";
@@ -23,10 +21,8 @@ jest.mock("../src/lib/wintson.logger", () => () => ({
 }));
 jest.mock("../src/routes/jwt.routes");
 jest.mock("../src/routes/session.routes");
-jest.mock("../src/routes/google.routes");
 jest.mock("../src/routes/two-factor-auth.routes");
 jest.mock("../src/config/session.config");
-jest.mock("../src/config/google.config");
 jest.mock("../src/config/oauth.config");
 jest.mock("../src/routes/oauth.routes");
 jest.mock("../src/middlewares/jwt.middleware", () =>
@@ -52,13 +48,6 @@ describe("index.ts config function", () => {
     const router = indexModule.config(config);
     expect(setupSession).toHaveBeenCalled();
     expect(sessionRoutes).toHaveBeenCalled();
-  });
-
-  it("should set up Google OAuth routes if enabled", () => {
-    const config: Config = { google: { enabled: true } } as any;
-    const router = indexModule.config(config);
-    expect(setupGoogleOath).toHaveBeenCalled();
-    expect(setupGoogleRoutes).toHaveBeenCalled();
   });
 
   it("should setup Twofactor Auth routes if enabled", () => {
