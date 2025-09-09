@@ -19,19 +19,20 @@ let configurations: Config = {} as Config;
 function config(config: Config): Router {
   configurations = config;
   const logger = createLogger(config);
-  logger.info("Info logs enabled");
-
+  logger.info("AuthCore module initialized");
   const router = express.Router();
 
   // Set up routes if JWT is enabled
   if (config.jwt && config.jwt.enabled) {
     jwtRoutes(router, configurations);
+    logger.info("JWT routes enabled");
   }
 
   // Set up routes if session is enabled
   if (config.session && config.session.enabled) {
     setupSession(router, configurations);
     sessionRoutes(router, configurations);
+    logger.info("Session routes enabled");
   }
 
   // Set up OAuth if enabled - SETUP BEFORE ROUTES
@@ -39,10 +40,12 @@ function config(config: Config): Router {
     router.use(passport.initialize());
     setupOAuth(configurations);
     oauthRoutes(router, config);
+    logger.info("OAuth routes enabled");
   }
 
   if (config.twoFA && config.twoFA.enabled) {
     twoFactorAuthRoutes(router, config);
+    logger.info("2FA routes enabled");
   }
 
   return router;
@@ -56,16 +59,20 @@ function verify(
     const { jwt, session } = configurations;
     const logger = createLogger(configurations);
 
-    //  Ensure user has permissions
+    // Ensure user has permissions
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const checkPermission = (user: any) => {
-      if (permission && (!user.grands || !user.grands.includes(permission))) {
+      if (permission && (!user.grants || !user.grants.includes(permission))) {
         logger.warn(
-          `Access denied: Missing required permission (${permission})`
+          `Access denied: Missing required permission (${permission}) for user: ${
+            user.username || "unknown"
+          }`
         );
-        return res
-          .status(403)
-          .json({ error: "Access denied: Missing required permission" });
+        return res.status(403).json({
+          error: "Access denied: Missing required permission",
+          required: permission,
+          userGrants: user.grants || [],
+        });
       }
       return next();
     };
@@ -76,7 +83,7 @@ function verify(
           logger.warn("JWT verification failed", { error: err.message });
           return res.status(403).json({ error: "Token is invalid or expired" });
         }
-        checkPermission(req.user);
+        return checkPermission(req.user);
       });
     } else if (session && session.enabled) {
       return sessionMiddleware(configurations)(req, res, (err) => {
@@ -84,15 +91,16 @@ function verify(
           logger.warn("Session verification failed", { error: err.message });
           return res.status(403).json({ error: "Invalid session" });
         }
-        checkPermission(req.user);
+        return checkPermission(req.user);
       });
     } else {
       logger.warn(
-        "Either JWT or session should configured to use verify middleware"
+        "Either JWT or session should be configured to use verify middleware"
       );
       return res.status(500).json({ error: "Authentication not configured" });
     }
   };
 }
 
+// Export the main functions
 export default { config, verify };

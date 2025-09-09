@@ -21,6 +21,20 @@ export interface JwtConfig {
   refresh?: boolean;
   refreshExpiresIn?: expiresIn;
   prefix?: string;
+  // Enhanced logout and security options
+  revokeOnRefresh?: boolean; // Whether to blacklist refresh token when creating new tokens
+  tokenBlacklist?: {
+    // Token blacklist configuration - OPTIONAL
+    enabled?: boolean; // If false or undefined, logout will be client-side only
+    storageService?: {
+      add: (token: string, expiresAt?: Date) => Promise<void> | void;
+      has: (token: string) => Promise<boolean> | boolean;
+      remove: (token: string) => Promise<void> | void;
+      clear: () => Promise<void> | void;
+    };
+    // Callback when user logs out of all sessions (for custom cleanup)
+    onLogoutAll?: (userId: string | number) => Promise<void> | void;
+  };
 }
 
 export interface TwoFAConfig {

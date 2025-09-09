@@ -127,11 +127,13 @@ describe("index.ts verify middleware", () => {
     const config: Config = { jwt: { enabled: true } } as any;
     indexModule.config(config);
     const middleware = indexModule.verify("admin");
-    req.user = { grands: ["user"] };
+    req.user = { grants: ["user"] };
     middleware(req as Request, res as Response, next);
     expect(res.status).toHaveBeenCalledWith(403);
     expect(res.json).toHaveBeenCalledWith({
       error: "Access denied: Missing required permission",
+      required: "admin",
+      userGrants: ["user"],
     });
   });
 
@@ -139,7 +141,7 @@ describe("index.ts verify middleware", () => {
     const config: Config = { jwt: { enabled: true } } as any;
     indexModule.config(config);
     const middleware = indexModule.verify("admin");
-    req.user = { grands: ["admin"] };
+    req.user = { grants: ["admin"] };
     middleware(req as Request, res as Response, next);
     expect(next).toHaveBeenCalled();
   });
