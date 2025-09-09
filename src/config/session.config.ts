@@ -5,13 +5,14 @@ import session from "express-session";
 // Function to set up session configuration
 export default (router: Router, config: Config) => {
   if (!config.session) {
-    throw new Error("Session auth not configured");
+    throw new Error("Session authentication not configured");
   }
+
   const { secret, resave, saveUninitialized, cookie } = config.session;
 
   router.use(
     session({
-      secret: secret || "Default_secret",
+      secret: secret || "default_session_secret",
       resave: resave || false,
       saveUninitialized: saveUninitialized || true,
       cookie: {
