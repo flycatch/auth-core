@@ -1,12 +1,13 @@
 # Auth-Core
 
-Auth-Core is a unified authentication middleware for Node.js applications, supporting JWT-based authentication, session-based authentication, and Google OAuth authentication. This package simplifies authentication management by providing middleware functions that handle authentication flows seamlessly.
+Auth-Core is a unified authentication middleware for Node.js applications, supporting JWT-based authentication, session-based authentication, and OAuth authentication. This package simplifies authentication management by providing middleware functions that handle authentication flows seamlessly.
 
 ## Features
 
-- **JWT Authentication**
-- **Session-based Authentication**
-- **Google OAuth Authentication**
+- **JWT Authentication** with optional token blacklisting and logout
+- **Session-based Authentication** with multiple sessions per user
+- **OAuth Authentication** (Google, Facebook, GitHub, Twitter, and custom providers)
+- **Two-Factor Authentication (2FA)**
 - **User Service Integration**
 - **Customizable Password Checker**
 - **Role & Permission-Based Access Control**
@@ -30,7 +31,7 @@ const app = express();
 
 const userRepository = {
   async find(email) {
-    return { id: "123", email, username: "exampleUser", grands: ["read_user"] };
+    return { id: "123", email, username: "exampleUser", grants: ["read_user"] };
   },
 };
 
@@ -42,6 +43,10 @@ app.use(
       expiresIn: "1h",
       refresh: true,
       prefix: "/auth/jwt",
+      // Optional: Enable token blacklisting for secure logout
+      tokenBlacklist: {
+        enabled: false, // Set to true for server-side logout
+      },
     },
     session: {
       enabled: false,
@@ -51,12 +56,23 @@ app.use(
       saveUninitialized: true,
       cookie: { secure: false, maxAge: 60000 },
     },
-    google: {
+    oauth: {
       enabled: false,
-      clientID: "GOOGLE_CLIENT_ID",
-      clientSecret: "GOOGLE_CLIENT_SECRET",
-      callbackURL: "/auth/google/callback",
-      secret: "google_secret",
+      baseURL: "http://localhost:3000",
+      prefix: "/auth/oauth",
+      providers: {
+        google: {
+          clientID: "GOOGLE_CLIENT_ID",
+          clientSecret: "GOOGLE_CLIENT_SECRET",
+          callbackURL: "/auth/oauth/google/callback",
+        },
+      },
+    },
+    twoFA: {
+      enabled: false,
+      prefix: "/auth/2fa",
+      otpLength: 6,
+      otpExpiresIn: "5m",
     },
     userService: {
       loadUser: async (email) => userRepository.find(email),
@@ -72,12 +88,17 @@ app.get("/user", verify(), (req, res) => {
   res.json({ message: "Access granted", user: req.user });
 });
 
+// Protected Route with specific permission
+app.get("/admin", verify("admin"), (req, res) => {
+  res.json({ message: "Admin access granted", user: req.user });
+});
+
 app.listen(3000, () => {
   console.log("Server running on http://localhost:3000");
 });
 ```
 
-## Configuration Options Explained
+## Configuration Options
 
 ### **JWT Authentication**
 
@@ -87,180 +108,182 @@ jwt: {
   secret: "my_jwt_secret",
   expiresIn: "1h",
   refresh: true,
+  refreshExpiresIn: "7d",
   prefix: "/auth/jwt",
-},
+  revokeOnRefresh: true,
+  tokenBlacklist: {
+    enabled: false, // Set to true for server-side logout
+    customStorage: { /* Custom storage implementation */ }
+  }
+}
 ```
 
 - **enabled**: Enables or disables JWT authentication.
 - **secret**: The secret key used to sign JWT tokens.
-- **expiresIn**: Defines how long the access token remains valid (e.g., "1h" for 1 hour).
+- **expiresIn**: Access token expiration time.
 - **refresh**: Enables refresh token support.
+- **refreshExpiresIn**: Refresh token expiration time.
 - **prefix**: The route prefix for JWT authentication endpoints.
+- **tokenBlacklist**: Optional token blacklisting for secure logout.
 
 ### **Session-Based Authentication**
 
 ```javascript
 session: {
-  enabled: false,
+  enabled: true,
   prefix: "/auth/session",
   secret: "my_session_secret",
   resave: false,
-  saveUninitialized: true,
-  cookie: { secure: false, maxAge: 60000 },
-},
+  saveUninitialized: false,
+  cookie: {
+    secure: false,
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
+}
 ```
 
 - **enabled**: Enables session-based authentication.
-- **prefix**: Defines the route prefix for session authentication endpoints.
-- **secret**: The session secret key.
-- **resave**: Determines if the session should be saved even if it wasn’t modified.
-- **saveUninitialized**: Saves uninitialized sessions.
-- **cookie**: Configures session cookies:
-  - **secure**: Ensures cookies are sent only over HTTPS.
-  - **maxAge**: Specifies cookie expiration time in milliseconds.
+- **prefix**: Route prefix for session authentication endpoints.
+- **secret**: Session secret key.
+- **resave/saveUninitialized**: Express session options.
+- **cookie**: Session cookie configuration.
 
-### **Google OAuth Authentication**
+**Note**: Session authentication supports multiple concurrent sessions per user. Each login creates a new independent session.
+
+### **OAuth Authentication**
 
 ```javascript
-google: {
-  enabled: false,
-  clientID: "GOOGLE_CLIENT_ID",
-  clientSecret: "GOOGLE_CLIENT_SECRET",
-  prefix:"/auth/google"
-},
+oauth: {
+  enabled: true,
+  baseURL: "http://localhost:3000",
+  prefix: "/auth/oauth",
+  providers: {
+    google: {
+      clientID: "GOOGLE_CLIENT_ID",
+      clientSecret: "GOOGLE_CLIENT_SECRET",
+      callbackURL: "/auth/oauth/google/callback",
+      scope: ["profile", "email"]
+    },
+    github: {
+      clientID: "GITHUB_CLIENT_ID",
+      clientSecret: "GITHUB_CLIENT_SECRET"
+    }
+  },
+  customProviders: {
+    myProvider: {
+      strategy: MyCustomStrategy,
+      clientID: "CLIENT_ID",
+      clientSecret: "CLIENT_SECRET"
+    }
+  }
+}
 ```
 
-- **enabled**: Enables Google OAuth authentication.
-- **clientID**: The Google OAuth Client ID.
-- **clientSecret**: The Google OAuth Client Secret.
-- **prefix**: Defines the route prefix for google oauth authentication endpoints.
+- **enabled**: Enables OAuth authentication.
+- **providers**: Supported providers (google, facebook, github, twitter).
+- **customProviders**: Add custom OAuth providers.
+
+### **Two-Factor Authentication**
+
+```javascript
+twoFA: {
+  enabled: true,
+  prefix: "/auth/2fa",
+  otpLength: 6,
+  otpExpiresIn: "5m",
+  transport: async (otp, user) => {
+    // Send OTP via SMS/Email
+    console.log(`Send OTP ${otp} to ${user.email}`);
+  }
+}
+```
 
 ### **User Service Integration**
 
 ```javascript
 userService: {
   loadUser: async (email) => userRepository.find(email),
-},
+}
 ```
-
-- **loadUser**: A function that fetches user details from a database based on the email provided.
 
 ### **Custom Password Checker**
 
 ```javascript
-passwordChecker: async (inputPassword, storedPassword) => bcrypt.compare(inputPassword, storedPassword),
+passwordChecker: async (inputPassword, storedPassword) =>
+  bcrypt.compare(inputPassword, storedPassword);
 ```
-
-- **passwordChecker**: A function to verify if the provided password matches the stored password (used for login authentication).
-
-### **Logging Configuration (logs)**
-
-The logs option controls the level of logging displayed during authentication.
-
-- **logs: true**: Enable detailed logging (info + warnings)
-- **logs: false**: Only show warnings (errors and unauthorized attempts)
-
-- **logs: true** → Displays info logs (successful authentication, token verification, etc.) along with warn logs.
-
-- **logs: false** → Suppresses info logs and only shows warn logs (e.g., unauthorized access, expired tokens).
-
-#### Example Logs When logs: true
-
-```
-[2025-02-05 10:30:15.234 AM] info: JWT Middleware Started...
-[2025-02-05 10:30:16.456 AM] info: Authorization Header Found!
-[2025-02-05 10:30:17.789 AM] info: JWT Verified Successfully!
-```
-
-- **Example Logs When logs**: false
-
-```
-[2025-02-05 10:30:18.234 AM] warn: Unauthorized access attempt (JWT missing)
-```
-
-## Authentication Flow
-
-1. **JWT Authentication**
-
-   - Users log in and receive a JWT token.
-   - The token is sent in the `Authorization` header (`Bearer <token>`).
-   - Middleware verifies the token and grants access.
-
-2. **Session-Based Authentication**
-
-   - User sessions are stored on the server.
-   - Sessions persist across requests until they expire.
-   - Middleware validates the session before granting access.
-
-3. **Google OAuth Authentication**
-   - Users log in via Google.
-   - The system fetches the user’s profile information.
-   - If JWT is enabled in the configuration:
-     - The user receives a JWT token for subsequent requests.
-   - Else if Session is enabled:
-     - A session is created and stored on the server.
-     - Sessions persist across requests until they expire.
-     - Middleware validates the session before granting access.
-   - Else if neither JWT nor Session is configured:
-     - The system throws a **500 Internal Server Error**.
-
-### `auth.config(config: Config): Router`
-
-Initializes AuthCore with the provided configuration. Returns an Express router that should be mounted in your app.
-
-### `auth.verify(): Middleware`
-
-Middleware to verify user authentication based on the enabled strategy (JWT, session, or Google OAuth).
 
 ## API Endpoints
 
-If a **prefix** is provided in the configuration, all authentication endpoints will be available at
-`{prefix}/...`.
-Otherwise, they fall back to the default paths listed below.
+All endpoints use the configured prefix. Default prefixes shown below:
 
-### **Login with JWT**
+### **JWT Authentication**
 
-- **With prefix:** `{prefix}/login`
-- **Without prefix:** `/auth/jwt/login`
+- **POST** `/auth/jwt/login` - User login
+- **POST** `/auth/jwt/refresh` - Refresh access token
+- **POST** `/auth/jwt/logout` - Logout (simple or with blacklisting)
 
-```http
-POST {prefix}/login
-```
+### **Session Authentication**
 
-### **Refresh JWT Token**
+- **POST** `/auth/session/login` - User login (creates new session)
+- **POST** `/auth/session/logout` - Logout current session
 
-- **With prefix:** {prefix}/refresh
-- **Without prefix:** /auth/jwt/refresh
+### **OAuth Authentication**
 
-```http
-POST {prefix}/refresh
-```
+- **GET** `/auth/{provider}` - Initiate OAuth login
+- **GET** `/auth/{provider}/callback` - OAuth callback
 
-### **Login with Session**
+### **Two-Factor Authentication**
 
-- **With prefix:** {prefix}/login
-- **Without prefix:** /auth/session/login
+- **POST** `/auth/2fa/send-otp` - Generate OTP
+- **POST** `/auth/2fa/verify` - Verify OTP
 
-```http
-POST {prefix}/login
-```
+## Authentication Flow
 
-### **Google OAuth Login**
+### **JWT Authentication**
 
-- **With prefix:** {prefix}/login
-- **Without prefix:** /auth/google/login
+1. User logs in and receives JWT tokens (access + refresh if enabled)
+2. Client includes token in `Authorization: Bearer <token>` header
+3. Middleware verifies token and grants access
+4. Optional: Token blacklisting for secure server-side logout
 
-```http
-POST {prefix}/login
-```
+### **Session Authentication**
 
-### **Google OAuth Callback**
+1. User logs in and server creates session
+2. Session cookie is automatically sent with requests
+3. Middleware validates session and grants access
+4. Supports multiple concurrent sessions per user
 
-- **With prefix:** {prefix}/callback
-- **Without prefix:** /auth/google/callback
+### **OAuth Authentication**
 
-```http
-POST {prefix}/callback
+1. User initiates OAuth flow with provider
+2. After successful authentication, returns JWT tokens or creates session
+3. Subsequent requests use JWT or session authentication
+
+## Logout Behavior
+
+### **JWT Logout**
+
+- **Simple Logout** (default): Client removes tokens, server logs event
+- **Advanced Logout** (with blacklisting): Server immediately invalidates tokens
+
+### **Session Logout**
+
+- Destroys current session only
+- Other sessions remain active (multi-session support)
+
+## Middleware Usage
+
+```javascript
+// Protect any route
+app.get("/protected", verify(), (req, res) => {
+  res.json({ user: req.user });
+});
+
+// Require specific permission
+app.get("/admin", verify("admin_access"), (req, res) => {
+  res.json({ message: "Admin only" });
+});
 ```
 
 ## Contributing
@@ -274,5 +297,3 @@ This project is licensed under the GPL-3.0 License.
 ## More
 
 - [How to use in Nest JS](./docs/nestjs_usage.md)
-
----
