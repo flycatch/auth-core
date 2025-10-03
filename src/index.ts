@@ -9,7 +9,6 @@ import setupOAuth from "./config/oauth.config";
 import oauthRoutes from "./routes/oauth.routes";
 import jwtMiddleware from "./middlewares/jwt.middleware";
 import sessionMiddleware from "./middlewares/session.middleware";
-import twoFactorAuthRoutes from "./routes/two-factor-auth.routes";
 import passport from "passport";
 
 // Configuration storage
@@ -67,11 +66,6 @@ function config(config: Config): Router {
     setupOAuth(configurations);
     oauthRoutes(router, config);
     logger.info("OAuth routes enabled");
-  }
-
-  if (config.twoFA && config.twoFA.enabled) {
-    twoFactorAuthRoutes(router, config);
-    logger.info("2FA routes enabled");
   }
 
   return router;

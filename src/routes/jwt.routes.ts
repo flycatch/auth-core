@@ -150,7 +150,6 @@ export default (router: Router, config: Config) => {
         res.status(200).json({
           message: "Send One Time Password for Two Factor Authentication",
         });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         if (error instanceof TransportNotFoundError) {
           logger.warn(error.message);
@@ -176,13 +175,13 @@ export default (router: Router, config: Config) => {
       try {
         const user = await config.userService.loadUser(email);
         if (!user) {
-          logger.warn("Invalid User")
+          logger.warn("Invalid User");
           return res.status(401).json({ error: "Login Failed" });
         }
 
         const isValid = await verifyOtp(user, otp);
         if (!isValid) {
-          logger.warn("Invalid OTP")
+          logger.warn("Invalid OTP");
           res.status(401).json({ error: "Login Failed" });
         }
 
@@ -198,8 +197,6 @@ export default (router: Router, config: Config) => {
         res.json(
           apiResponse(201, "Two Factor Oath Successful", true, [tokens])
         );
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         if (error instanceof OtpExpiredError || InvalidOtpError) {
           logger.warn(error.message);

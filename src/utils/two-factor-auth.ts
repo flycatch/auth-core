@@ -3,12 +3,26 @@ import ms from "ms"; // Optional dep for parsing '5m' to ms; add if not present
 import { Config } from "../interfaces/config.interface";
 import { User } from "../interfaces/user.interface";
 
-// Pure: Generate random OTP
-const generateOtp = (length: number): string =>
-  crypto
-    .randomBytes(length / 2)
-    .toString("hex")
-    .padStart(length, "0"); // Ensure numeric, fixed length
+/**Function to generate otp with provided length and type (numeric and alphanumeric types are suppoted) */
+export function generateOtp(
+  length: number = 6,
+  format: "numeric" | "alphanumeric"
+): string {
+  let chars = "";
+  switch (format) {
+    case "numeric":
+      chars = "0123456789";
+      break;
+    case "alphanumeric":
+      chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+      break;
+    default:
+      throw new Error("Invalid OTP format");
+  }
+  return Array.from(crypto.randomBytes(length))
+    .map((byte) => chars[byte % chars.length])
+    .join("");
+}
 
 // Higher-order: Create configured handlers
 
@@ -19,7 +33,10 @@ export default (config: Config["twoFA"]) => {
 
   // Impure (side effects): Initiate 2FA flow
   const initiate2fa = async (user: User): Promise<void> => {
-    const otp = generateOtp(config.otpLength ? config.otpLength : 6);
+    const otp = generateOtp(
+      config.otpLength ? config.otpLength : 6,
+      config.otpType ? config.otpType : "numeric"
+    );
     const rawExpiresIn = config.otpExpiresIn ?? "5m";
 
     const expiresInMs =

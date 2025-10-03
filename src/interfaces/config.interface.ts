@@ -40,15 +40,15 @@ export interface JwtConfig {
 export interface TwoFAConfig {
   enabled: boolean;
   otpLength?: number;
+  otpType?: "numeric" | "alphanumeric";
   otpExpiresIn?: expiresIn;
-  prefix?: string;
   transport?: (otp: string, user: User) => Promise<void>;
-  storeOtp?: (
+  storeOtp: (
     userId: string | number,
     otp: string,
     expiresInMs: number
   ) => Promise<void>;
-  getStoredOtp?: (userId: string | number) => Promise<string | null>;
+  getStoredOtp: (userId: string | number) => Promise<string | null>;
   clearOtp?: (userId: string | number) => Promise<void>;
   onOtpGenerated?: (otp: string, user: User) => Promise<void>;
   onOtpSent?: (user: User) => Promise<void>;
