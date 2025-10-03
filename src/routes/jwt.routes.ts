@@ -1,11 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Router } from "express";
+import { Request, Response, Router } from "express";
 import { Config } from "../interfaces/config.interface";
 import jwt from "jsonwebtoken";
 import express from "express";
 import createLogger from "../lib/wintson.logger";
 import apiResponse from "../utils/api-response";
 import { createJwtTokens } from "../utils/jwt";
+import twoFactorAuth, {
+  InvalidOtpError,
+  OtpExpiredError,
+  TransportNotFoundError,
+} from "../utils/two-factor-auth";
 
 // Token blacklist management - only used if enabled
 const tokenBlacklist = new Set<string>();
@@ -66,54 +71,145 @@ export default (router: Router, config: Config) => {
   const prefix = config.jwt.prefix || "/auth/jwt";
   const isBlacklistEnabled = config.jwt.tokenBlacklist?.enabled ?? false;
 
+  const { initiate2fa, verifyOtp } = twoFactorAuth(config.twoFA);
+
   // Login Route
-  router.post(`${prefix}/login`, async (req, res) => {
-    if (!config.jwt) {
-      throw new Error("JWT not configured");
-    }
-
-    const { username, password } = req.body;
-    logger.info(`Login attempt for user: ${username}`);
-
-    // Validate input
-    if (!username || !password) {
-      logger.warn("Login failed: Missing username or password");
-      return res
-        .status(400)
-        .json(apiResponse(400, "Username and password are required", false));
-    }
-
-    try {
-      const user = await config.userService.loadUser(username);
-      if (!user) {
-        logger.warn(`Login failed: User not found (username: ${username})`);
-        return res
-          .status(401)
-          .json(apiResponse(401, "Invalid username or password", false));
+  if (!config.twoFA?.enabled) {
+    router.post(`${prefix}/login`, async (req: Request, res: Response) => {
+      if (!config.jwt) {
+        throw new Error("JWT not configured");
       }
 
-      const isValidPassword = await config.passwordChecker(
-        password,
-        user.password
-      );
+      const { username, password } = req.body;
+      logger.info(`Login attempt for user: ${username}`);
 
-      if (!isValidPassword) {
-        logger.warn(`Login failed: Incorrect password for user: ${username}`);
+      // Validate input
+      if (!username || !password) {
+        logger.warn("Login failed: Missing username or password");
         return res
-          .status(401)
-          .json(apiResponse(401, "Invalid username or password", false));
+          .status(400)
+          .json(apiResponse(400, "Username and password are required", false));
       }
 
-      // Create jwt tokens
-      const jwtTokens = createJwtTokens(config.jwt, user);
-      logger.info(`Login successful for user: ${username}`);
+      try {
+        const user = await config.userService.loadUser(username);
+        if (!user) {
+          logger.warn(`Login failed: User not found (username: ${username})`);
+          return res.status(401).json(apiResponse(401, "Login Failed", false));
+        }
 
-      res.json(apiResponse(200, "Login successful", true, [jwtTokens]));
-    } catch (error) {
-      logger.error(`JWT Login Error for username: ${username}`, { error });
-      res.status(500).json(apiResponse(500, "Internal Server Error", false));
-    }
-  });
+        const isValidPassword = await config.passwordChecker(
+          password,
+          user.password
+        );
+
+        if (!isValidPassword) {
+          logger.warn(`Login failed: Incorrect password for user: ${username}`);
+          return res.status(401).json(apiResponse(401, "Login Failed", false));
+        }
+
+        // Create jwt tokens
+        const jwtTokens = createJwtTokens(config.jwt, user);
+        logger.info(`Login successful for user: ${username}`);
+
+        res.json(apiResponse(200, "Login successful", true, [jwtTokens]));
+      } catch (error) {
+        logger.error(`JWT Login Error for username: ${username}`, { error });
+        res.status(500).json(apiResponse(500, "Internal Server Error", false));
+      }
+    });
+  } else {
+    router.post(`${prefix}/login`, async (req: Request, res: Response) => {
+      try {
+        if (!config.twoFA || !config.twoFA.enabled) {
+          throw new Error("Two Factor Authentication is not enabled");
+        }
+
+        const { username } = req.body;
+        if (!username) {
+          return res
+            .status(400)
+            .json({ message: "Email required on request payload" });
+        }
+
+        const user = await config.userService.loadUser(username);
+        if (!user) {
+          logger.warn(`Invalid username`);
+          return res.status(401).json({ message: "Login Failed" });
+        }
+
+        if (!user.is2faEnabled) {
+          logger.warn("Two Factor Authentication is not enabled for the user");
+          return res.status(403).json({
+            error: "Two Factor Authentication is not enabled for the user",
+          });
+        }
+
+        await initiate2fa(user);
+        logger.info(`OTP Generated and transported succesfully`);
+        res.status(200).json({
+          message: "Send One Time Password for Two Factor Authentication",
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } catch (error: any) {
+        if (error instanceof TransportNotFoundError) {
+          logger.warn(error.message);
+          return res
+            .status(500)
+            .json({ error: "OTP generated, but No Transport Available" });
+        }
+        logger.error(`Two Factor Auth initalization Failed: ${error.message}`);
+        res.status(500).json({
+          error: "Two Factor Auth initalization Failed",
+        });
+      }
+    });
+
+    router.post(`${prefix}/verify`, async (req: Request, res: Response) => {
+      const { otp, email } = req.body;
+      if (!otp || !email) {
+        return res.status(400).json({
+          error: "Both 'otp' and 'email' are required in the request payload.",
+        });
+      }
+
+      try {
+        const user = await config.userService.loadUser(email);
+        if (!user) {
+          logger.warn("Invalid User")
+          return res.status(401).json({ error: "Login Failed" });
+        }
+
+        const isValid = await verifyOtp(user, otp);
+        if (!isValid) {
+          logger.warn("Invalid OTP")
+          res.status(401).json({ error: "Login Failed" });
+        }
+
+        logger.info("OTP Verified Successfully");
+
+        if (!config.jwt) {
+          throw Error("Jwt Configuration not found at verification");
+        }
+
+        const tokens = createJwtTokens(config.jwt, user);
+
+        logger.info(`JWT Login Succesful`);
+        res.json(
+          apiResponse(201, "Two Factor Oath Successful", true, [tokens])
+        );
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } catch (error: any) {
+        if (error instanceof OtpExpiredError || InvalidOtpError) {
+          logger.warn(error.message);
+          return res.status(401).json({ error: error.message });
+        }
+        logger.error(error.message);
+        res.status(500).json({ error: error.message });
+      }
+    });
+  }
 
   // Refresh Token Route
   if (config.jwt.refresh) {

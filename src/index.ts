@@ -17,6 +17,32 @@ let configurations: Config = {} as Config;
 
 // Function to initialize configurations and set up routes
 function config(config: Config): Router {
+  const jwtEnabled = config.jwt?.enabled ?? false;
+  const sessionEnabled = config.session?.enabled ?? false;
+  if (jwtEnabled && sessionEnabled) {
+    throw new Error(
+      "Cannot enable both JWT and Session authentication simultaneously."
+    );
+  }
+  if (!jwtEnabled && !sessionEnabled) {
+    throw new Error(
+      "At least one of JWT or Session authentication must be enabled."
+    );
+  }
+
+  // Validate required settings (expand as needed for other configs like OAuth, 2FA)
+  if (jwtEnabled && !config.jwt?.secret) {
+    throw new Error("JWT secret is required when JWT is enabled.");
+  }
+  if (sessionEnabled && !config.session?.secret) {
+    throw new Error("Session secret is required when Session is enabled.");
+  }
+  if (
+    config.twoFA?.enabled &&
+    (!config.twoFA.storeOtp || !config.twoFA.getStoredOtp)
+  ) {
+    throw new Error("User service is required for 2FA to handle OTP storage.");
+  }
   configurations = config;
   const logger = createLogger(config);
   logger.info("AuthCore module initialized");
