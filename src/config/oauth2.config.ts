@@ -3,31 +3,34 @@ import passport from "passport";
 import { Config, CustomProviderConfig } from "../interfaces/config.interface";
 import { createCustomVerifyCallback } from "../utils/verify-callback";
 
-export const setupCustomProviders = (config: Config, logger: any) => {
-  if (!config.oauth?.customProviders) return;
+export default (config: Config, logger: any) => {
+  if (!config.oauth2?.providers) return;
 
-  Object.entries(config.oauth.customProviders).forEach(
+  Object.entries(config.oauth2.providers).forEach(
     ([providerName, providerConfig]) => {
       try {
-        setupCustomProvider(providerName, providerConfig, config, logger);
+        setupOauth2Provider(providerName, providerConfig, config, logger);
       } catch (error) {
-        logger.error(`Failed to setup custom provider ${providerName}:`, error);
+        logger.error(
+          `Failed to setup ouath 2.0 provider for ${providerName}:`,
+          error
+        );
       }
     }
   );
 };
 
 // Setup individual custom OAuth 2.0 provider
-const setupCustomProvider = (
+const setupOauth2Provider = (
   providerName: string,
   providerConfig: CustomProviderConfig,
   config: Config,
   logger: any
 ) => {
-  if (!config.oauth) {
+  if (!config.oauth2) {
     throw new Error();
   }
-  logger.info(`Setting up custom OAuth 2.0 provider: ${providerName}`);
+  logger.info(`Setting up OAuth 2.0 provider for ${providerName}`);
 
   // Create strategy configuration
   const strategyConfig = {
@@ -35,7 +38,7 @@ const setupCustomProvider = (
     clientSecret: providerConfig.clientSecret,
     callbackURL:
       providerConfig.callbackURL ||
-      `${config.oauth.prefix || "/auth"}/${providerName}/callback`,
+      `${config.oauth2.prefix || "/auth"}/${providerName}/callback`,
     scope: providerConfig.scope || ["profile", "email"],
     ...providerConfig.customConfig,
   };
@@ -50,5 +53,5 @@ const setupCustomProvider = (
   const strategy = new StrategyClass(strategyConfig, verifyCallback);
 
   passport.use(providerName, strategy);
-  logger.info(`Custom OAuth 2.0 provider ${providerName} setup complete`);
+  logger.info(`${providerName} OAuth 2.0 provider setup complete`);
 };

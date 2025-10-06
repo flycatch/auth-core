@@ -59,14 +59,11 @@ export interface TwoFAConfig {
 // OAuth 2.0 Configuration Interface (OAuth 2.0 only)
 export type OAuth2Providers = "google" | "facebook" | "github" | "twitter";
 
-export interface BaseProviderConfig {
+export interface CustomProviderConfig {
   clientID: string;
   clientSecret: string;
   callbackURL?: string;
   scope?: string[];
-}
-
-export interface CustomProviderConfig extends BaseProviderConfig {
   // Strategy class or constructor function for OAuth 2.0
   strategy: any;
   // Custom configuration specific to the provider
@@ -91,11 +88,7 @@ export interface OAuth2Config {
   baseURL?: string;
   prefix?: string;
   providers: {
-    [key in OAuth2Providers]?: BaseProviderConfig;
-  };
-  // Global custom providers configuration
-  customProviders?: {
-    [providerName: string]: CustomProviderConfig;
+    [key in OAuth2Providers]?: CustomProviderConfig;
   };
 }
 
@@ -103,7 +96,7 @@ export interface Config {
   jwt?: JwtConfig;
   session?: SessionConfig;
   twoFA?: TwoFAConfig;
-  oauth?: OAuth2Config;
+  oauth2?: OAuth2Config;
   userService: {
     loadUser: (email: string) => Promise<User | null | undefined>;
   };

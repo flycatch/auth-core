@@ -5,11 +5,11 @@ import createLogger from "./lib/wintson.logger";
 import jwtRoutes from "./routes/jwt.routes";
 import sessionRoutes from "./routes/session.routes";
 import setupSession from "./config/session.config";
-import setupOAuth from "./config/oauth.config";
-import oauthRoutes from "./routes/oauth.routes";
+import oauth2Routes from "./routes/oauth2.routes";
 import jwtMiddleware from "./middlewares/jwt.middleware";
 import sessionMiddleware from "./middlewares/session.middleware";
 import passport from "passport";
+import oauth2Config from "./config/oauth2.config";
 
 // Configuration storage
 let configurations: Config = {} as Config;
@@ -61,10 +61,10 @@ function config(config: Config): Router {
   }
 
   // Set up OAuth if enabled - SETUP BEFORE ROUTES
-  if (config.oauth?.enabled) {
+  if (config.oauth2?.enabled) {
     router.use(passport.initialize());
-    setupOAuth(configurations);
-    oauthRoutes(router, config);
+    oauth2Config(config, logger);
+    oauth2Routes(router, config);
     logger.info("OAuth routes enabled");
   }
 
