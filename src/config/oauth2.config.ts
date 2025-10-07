@@ -9,6 +9,9 @@ export default (config: Config, logger: any) => {
   Object.entries(config.oauth2.providers).forEach(
     ([providerName, providerConfig]) => {
       try {
+        if (!providerConfig) {
+          throw Error;
+        }
         setupOauth2Provider(providerName, providerConfig, config, logger);
       } catch (error) {
         logger.error(

@@ -30,7 +30,7 @@ export default (router: Router, config: Config) => {
             next();
           },
           passport.authenticate(providerName, {
-            scope: providerConfig.scope || ["profile", "email"],
+            scope: providerConfig?.scope || ["profile", "email"],
           })
         );
 

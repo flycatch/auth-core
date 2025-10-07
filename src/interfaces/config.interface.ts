@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { OAuth2Providers } from "./oauth2.type";
 import { User } from "./user.interface";
 
 export interface SessionConfig {
@@ -55,9 +56,6 @@ export interface TwoFAConfig {
   onVerifySuccess?: (user: User) => Promise<void>;
   onVerifyFail?: (user: User, error: any) => Promise<void>;
 }
-
-// OAuth 2.0 Configuration Interface (OAuth 2.0 only)
-export type OAuth2Providers = "google" | "facebook" | "github" | "twitter";
 
 export interface CustomProviderConfig {
   clientID: string;
