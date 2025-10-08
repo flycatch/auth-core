@@ -48,7 +48,8 @@ jest.mock("passport", () => ({
     .mockImplementation(
       (strategy, options) => (req: any, res: any, next: any) => {
         if (req.url.includes("callback") && req.query.error) {
-          res.redirect(options.failureRedirect);
+          // Simulate error response for invalid OAuth code
+          res.status(400).json({ error: "Authentication failed" });
         } else if (req.url.includes("callback")) {
           req.user = {
             id: "123",
