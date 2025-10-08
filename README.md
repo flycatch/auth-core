@@ -1,13 +1,13 @@
 # Auth-Core
 
-Auth-Core is a unified authentication middleware for Node.js applications, supporting JWT-based authentication, session-based authentication, and OAuth authentication. This package simplifies authentication management by providing middleware functions that handle authentication flows seamlessly.
+Auth-Core is a unified authentication middleware for Node.js applications, supporting JWT-based authentication, session-based authentication, and OAuth 2.0 authentication. This package simplifies authentication management by providing middleware functions that handle authentication flows seamlessly.
 
 ## Features
 
 - **JWT Authentication** with optional token blacklisting and logout
 - **Session-based Authentication** with multiple sessions per user
-- **OAuth Authentication** (Google, Facebook, GitHub, Twitter, and custom providers)
-- **Two-Factor Authentication (2FA)**
+- **OAuth 2.0 Authentication** (Google, GitHub, and custom providers)
+- **Two-Factor Authentication (2FA)** integrated with JWT and session-based authentication
 - **User Service Integration**
 - **Customizable Password Checker**
 - **Role & Permission-Based Access Control**
@@ -31,7 +31,13 @@ const app = express();
 
 const userRepository = {
   async find(email) {
-    return { id: "123", email, username: "exampleUser", grants: ["read_user"] };
+    return {
+      id: "123",
+      email,
+      username: "exampleUser",
+      grants: ["read_user"],
+      is2faEnabled: false,
+    };
   },
 };
 
@@ -43,7 +49,6 @@ app.use(
       expiresIn: "1h",
       refresh: true,
       prefix: "/auth/jwt",
-      // Optional: Enable token blacklisting for secure logout
       tokenBlacklist: {
         enabled: false, // Set to true for server-side logout
       },
@@ -56,15 +61,16 @@ app.use(
       saveUninitialized: true,
       cookie: { secure: false, maxAge: 60000 },
     },
-    oauth: {
+    oauth2: {
       enabled: false,
       baseURL: "http://localhost:3000",
-      prefix: "/auth/oauth",
+      prefix: "/auth",
       providers: {
         google: {
           clientID: "GOOGLE_CLIENT_ID",
           clientSecret: "GOOGLE_CLIENT_SECRET",
-          callbackURL: "/auth/oauth/google/callback",
+          callbackURL: "/auth/google/callback",
+          scope: ["profile", "email"],
         },
       },
     },
@@ -73,6 +79,16 @@ app.use(
       prefix: "/auth/2fa",
       otpLength: 6,
       otpExpiresIn: "5m",
+      storeOtp: async (userId, otp, expiresInMs) => {
+        // Implement OTP storage logic
+        console.log(
+          `Storing OTP ${otp} for user ${userId}, expires in ${expiresInMs}ms`
+        );
+      },
+      getStoredOtp: async (userId) => {
+        // Implement OTP retrieval logic
+        return null;
+      },
     },
     userService: {
       loadUser: async (email) => userRepository.find(email),
@@ -112,8 +128,14 @@ jwt: {
   prefix: "/auth/jwt",
   revokeOnRefresh: true,
   tokenBlacklist: {
-    enabled: false, // Set to true for server-side logout
-    customStorage: { /* Custom storage implementation */ }
+    enabled: false,
+    storageService: {
+      add: async (token, expiresAt) => { /* Custom add logic */ },
+      has: async (token) => { /* Custom check logic */ },
+      remove: async (token) => { /* Custom remove logic */ },
+      clear: async () => { /* Custom clear logic */ },
+    },
+    onLogoutAll: async (userId) => { /* Custom logout all logic */ },
   }
 }
 ```
@@ -125,6 +147,9 @@ jwt: {
 - **refreshExpiresIn**: Refresh token expiration time.
 - **prefix**: The route prefix for JWT authentication endpoints.
 - **tokenBlacklist**: Optional token blacklisting for secure logout.
+  - **enabled**: Enables server-side token blacklisting.
+  - **storageService**: Custom storage for blacklisted tokens.
+  - **onLogoutAll**: Callback for custom cleanup on logout-all.
 
 ### **Session-Based Authentication**
 
@@ -150,38 +175,33 @@ session: {
 
 **Note**: Session authentication supports multiple concurrent sessions per user. Each login creates a new independent session.
 
-### **OAuth Authentication**
+### **OAuth 2.0 Authentication**
 
 ```javascript
-oauth: {
+oauth2: {
   enabled: true,
   baseURL: "http://localhost:3000",
-  prefix: "/auth/oauth",
+  prefix: "/auth",
   providers: {
     google: {
       clientID: "GOOGLE_CLIENT_ID",
       clientSecret: "GOOGLE_CLIENT_SECRET",
-      callbackURL: "/auth/oauth/google/callback",
-      scope: ["profile", "email"]
+      callbackURL: "/auth/google/callback",
+      scope: ["profile", "email"],
     },
     github: {
       clientID: "GITHUB_CLIENT_ID",
-      clientSecret: "GITHUB_CLIENT_SECRET"
-    }
+      clientSecret: "GITHUB_CLIENT_SECRET",
+      callbackURL: "/auth/github/callback",
+    },
   },
-  customProviders: {
-    myProvider: {
-      strategy: MyCustomStrategy,
-      clientID: "CLIENT_ID",
-      clientSecret: "CLIENT_SECRET"
-    }
-  }
 }
 ```
 
-- **enabled**: Enables OAuth authentication.
-- **providers**: Supported providers (google, facebook, github, twitter).
-- **customProviders**: Add custom OAuth providers.
+- **enabled**: Enables OAuth 2.0 authentication.
+- **baseURL**: Base URL for callback redirects.
+- **prefix**: Route prefix for OAuth authentication endpoints.
+- **providers**: Supported providers (e.g., Google, GitHub).
 
 ### **Two-Factor Authentication**
 
@@ -190,13 +210,33 @@ twoFA: {
   enabled: true,
   prefix: "/auth/2fa",
   otpLength: 6,
+  otpType: "numeric",
   otpExpiresIn: "5m",
   transport: async (otp, user) => {
-    // Send OTP via SMS/Email
     console.log(`Send OTP ${otp} to ${user.email}`);
-  }
+  },
+  storeOtp: async (userId, otp, expiresInMs) => {
+    // Implement OTP storage
+  },
+  getStoredOtp: async (userId) => {
+    // Implement OTP retrieval
+    return null;
+  },
+  clearOtp: async (userId) => {
+    // Implement OTP cleanup
+  },
 }
 ```
+
+- **enabled**: Enables 2FA for JWT or session-based authentication.
+- **prefix**: Route prefix for 2FA endpoints.
+- **otpLength**: Length of the OTP.
+- **otpType**: Type of OTP (numeric or alphanumeric).
+- **otpExpiresIn**: OTP expiration time.
+- **transport**: Function to send OTP to the user.
+- **storeOtp**: Function to store OTP securely.
+- **getStoredOtp**: Function to retrieve stored OTP.
+- **clearOtp**: Optional function to clear OTP after verification.
 
 ### **User Service Integration**
 
@@ -219,58 +259,69 @@ All endpoints use the configured prefix. Default prefixes shown below:
 
 ### **JWT Authentication**
 
-- **POST** `/auth/jwt/login` - User login
+- **POST** `/auth/jwt/login` - Initiate user login (sends OTP if 2FA enabled, else returns tokens)
+- **POST** `/auth/jwt/verify` - Verify OTP for 2FA and return tokens
 - **POST** `/auth/jwt/refresh` - Refresh access token
 - **POST** `/auth/jwt/logout` - Logout (simple or with blacklisting)
+- **POST** `/auth/jwt/logout-all` - Logout all sessions (requires blacklisting enabled)
 
 ### **Session Authentication**
 
-- **POST** `/auth/session/login` - User login (creates new session)
+- **POST** `/auth/session/login` - Initiate user login (sends OTP if 2FA enabled, else creates session)
+- **POST** `/auth/session/verify` - Verify OTP for 2FA and create session
 - **POST** `/auth/session/logout` - Logout current session
 
-### **OAuth Authentication**
+### **OAuth 2.0 Authentication**
 
 - **GET** `/auth/{provider}` - Initiate OAuth login
 - **GET** `/auth/{provider}/callback` - OAuth callback
+- **GET** `/auth/error` - OAuth error redirect
 
 ### **Two-Factor Authentication**
 
-- **POST** `/auth/2fa/send-otp` - Generate OTP
-- **POST** `/auth/2fa/verify` - Verify OTP
+- Integrated with JWT and session authentication flows.
+- If enabled, `/login` endpoints trigger OTP generation and transport.
+- Use `/verify` endpoints to validate OTP and complete login.
 
 ## Authentication Flow
 
 ### **JWT Authentication**
 
-1. User logs in and receives JWT tokens (access + refresh if enabled)
-2. Client includes token in `Authorization: Bearer <token>` header
-3. Middleware verifies token and grants access
-4. Optional: Token blacklisting for secure server-side logout
+1. User sends login request to `/auth/jwt/login`.
+2. If 2FA is enabled, server sends OTP and user submits it to `/auth/jwt/verify`.
+3. On successful verification (or directly if 2FA is disabled), server returns JWT tokens (access + refresh if enabled).
+4. Client includes token in `Authorization: Bearer <token>` header.
+5. Middleware verifies token and grants access.
+6. Optional: Token blacklisting for secure server-side logout.
 
 ### **Session Authentication**
 
-1. User logs in and server creates session
-2. Session cookie is automatically sent with requests
-3. Middleware validates session and grants access
-4. Supports multiple concurrent sessions per user
+1. User sends login request to `/auth/session/login`.
+2. If 2FA is enabled, server sends OTP and user submits it to `/auth/session/verify`.
+3. On successful verification (or directly if 2FA is disabled), server creates a new session.
+4. Session cookie is automatically sent with requests.
+5. Middleware validates session and grants access.
+6. Supports multiple concurrent sessions per user.
 
-### **OAuth Authentication**
+### **OAuth 2.0 Authentication**
 
-1. User initiates OAuth flow with provider
-2. After successful authentication, returns JWT tokens or creates session
-3. Subsequent requests use JWT or session authentication
+1. User initiates OAuth flow with provider via `/auth/{provider}`.
+2. After successful authentication, provider redirects to `/auth/{provider}/callback`.
+3. Server returns JWT tokens or creates a session.
+4. Subsequent requests use JWT or session authentication.
 
 ## Logout Behavior
 
 ### **JWT Logout**
 
-- **Simple Logout** (default): Client removes tokens, server logs event
-- **Advanced Logout** (with blacklisting): Server immediately invalidates tokens
+- **Simple Logout** (default): Client removes tokens, server logs event.
+- **Advanced Logout** (with blacklisting): Server invalidates tokens.
+- **Logout All**: Invalidates all tokens for a user (requires blacklisting).
 
 ### **Session Logout**
 
-- Destroys current session only
-- Other sessions remain active (multi-session support)
+- Destroys current session only.
+- Other sessions remain active (multi-session support).
 
 ## Middleware Usage
 
