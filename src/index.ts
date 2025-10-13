@@ -42,6 +42,25 @@ function config(config: Config): Router {
   ) {
     throw new Error("User service is required for 2FA to handle OTP storage.");
   }
+
+  if (config.oauth2?.enabled) {
+    if (!config.oauth2.successRedirect) {
+      throw new Error(
+        "OAuth2 successRedirect is required when OAuth2 is enabled"
+      );
+    }
+    if (!config.oauth2.failureRedirect) {
+      throw new Error(
+        "OAuth2 failureRedirect is required when OAuth2 is enabled"
+      );
+    }
+    if (config.oauth2.autoProvision && !config.userService.createUser) {
+      throw new Error(
+        "UserService.createUser is required when OAuth2 autoProvision is enabled"
+      );
+    }
+  }
+
   configurations = config;
   const logger = createLogger(config);
   logger.info("AuthCore module initialized");

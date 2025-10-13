@@ -2,7 +2,6 @@
 import { NextFunction, Request, Response, Router } from "express";
 import { Config } from "../interfaces/config.interface";
 import passport from "passport";
-import apiResponse from "../utils/api-response";
 import createLogger from "../lib/wintson.logger";
 import { createJwtTokens } from "../utils/jwt";
 import { User } from "../interfaces/user.interface";
@@ -22,20 +21,11 @@ export default (router: Router, config: Config) => {
       try {
         logger.info(`Setting up routes for custom provider: ${providerName}`);
 
-        // Auth initiation route - simple popup
+        // Auth initiation route - redirects to provider
         router.get(
           `${basePrefix}/${providerName}`,
           (req: Request, res: Response, next: NextFunction) => {
-            const redirect_uri = req.query.redirect_uri as string;
-
-            // Store redirect_uri in session for callback
-            if (req.session && redirect_uri) {
-              req.session.oauthRedirectUri = redirect_uri;
-            }
-
-            logger.info(`Initiating ${providerName} OAuth flow`, {
-              redirect_uri,
-            });
+            logger.info(`Initiating ${providerName} OAuth flow`);
 
             const authenticator = passport.authenticate(providerName, {
               scope: providerConfig?.scope || ["profile", "email"],
@@ -45,15 +35,22 @@ export default (router: Router, config: Config) => {
           }
         );
 
-        // Auth callback route - simple redirect back to frontend
+        // Auth callback route - handles provider response
         router.get(
           `${basePrefix}/${providerName}/callback`,
           (req: Request, res: Response, next: NextFunction) => {
-            const { error } = req.query;
+            const { error, error_description } = req.query;
 
             if (error) {
-              logger.error(`OAuth provider error: ${error}`);
-              return handleOAuthError(res, error as string);
+              logger.error(
+                `OAuth provider error: ${error} - ${error_description}`
+              );
+              return handleOAuthFailure(
+                res,
+                config,
+                error as string,
+                error_description as string
+              );
             }
 
             next();
@@ -62,66 +59,100 @@ export default (router: Router, config: Config) => {
           (req: Request, res: Response, next: NextFunction) => {
             passport.authenticate(providerName, {
               session: false,
-              failureRedirect: "/auth/error",
+              failureRedirect: `${basePrefix}/error`, // Use internal error handler
             } as any)(req, res, next);
           },
-          // Simple callback handler
+          // Success handler
           async (req: Request, res: Response) => {
             try {
-              const redirectUri = req.session?.oauthRedirectUri;
-
-              // Clean up session
-              if (req.session) {
-                delete req.session.oauthRedirectUri;
-              }
-
               logger.info(`Handling ${providerName} OAuth callback`, {
                 hasUser: !!req.user,
-                redirectUri,
               });
 
               if (!req.user) {
                 logger.error("User data missing in OAuth callback");
-                return handleOAuthError(res, "user_data_missing");
+                return handleOAuthFailure(
+                  res,
+                  config,
+                  "user_data_missing",
+                  "User data not found"
+                );
               }
 
-              let authResult;
+              const user = req.user as User;
 
-              // Use existing module logic - exactly like your JWT/Session routes
-              if (config.jwt?.enabled) {
-                authResult = createJwtTokens(config.jwt, req.user as User);
+              // Generate tokens based on configuration
+              let authResult;
+              let accessToken: string | undefined;
+              let refreshToken: string | undefined;
+
+              if (config.oauth2?.issueJwt !== false && config.jwt?.enabled) {
+                // Include authorities/grants in JWT if configured
+                const jwtPayload: any = {
+                  provider: user.provider,
+                  email: user.email,
+                };
+
+                if (
+                  config.oauth2 &&
+                  config.oauth2.includeAuthorities &&
+                  user.grants
+                ) {
+                  jwtPayload.grants = user.grants;
+                  // Extract roles if needed
+                  const roles = user.grants.filter((grant: string | number) =>
+                    String(grant).startsWith("ROLE_")
+                  );
+                  if (roles.length > 0) {
+                    jwtPayload.roles = roles;
+                  }
+                }
+
+                // Use the original 2-parameter function
+                authResult = createJwtTokens(config.jwt, user);
+                accessToken = authResult.accessToken;
+                refreshToken = authResult.refreshToken;
+
                 logger.info("JWT tokens created for OAuth user");
               } else if (config.session?.enabled) {
-                authResult = createSessionPayload(req.user as User);
+                authResult = createSessionPayload(user);
                 req.session.user = authResult;
                 logger.info("Session created for OAuth user");
               } else {
                 logger.error("No authentication method configured");
-                return handleOAuthError(res, "auth_not_configured");
-              }
-
-              // Simple redirect back to frontend with tokens
-              if (redirectUri) {
-                return redirectToFrontend(
+                return handleOAuthFailure(
                   res,
-                  authResult,
-                  redirectUri,
-                  providerName
+                  config,
+                  "auth_not_configured",
+                  "Authentication method not configured"
                 );
               }
 
-              // Fallback: return JSON response (for API clients)
-              res.json(
-                apiResponse(201, `${providerName} OAuth Successful`, true, [
-                  authResult,
-                ])
+              // Set refresh token as HTTP-only cookie if enabled
+              if (
+                config.oauth2?.setRefreshCookie &&
+                refreshToken &&
+                config.cookies?.enabled
+              ) {
+                setRefreshTokenCookie(res, refreshToken, config);
+                logger.info("Refresh token set as HTTP-only cookie");
+              }
+
+              // Redirect to success URL
+              return handleOAuthSuccess(
+                res,
+                config,
+                providerName,
+                accessToken,
+                refreshToken,
+                user
               );
             } catch (err: any) {
               logger.error(`Error during ${providerName} OAuth callback`, {
                 error: err.message,
+                stack: err.stack,
               });
-
-              handleOAuthError(res, err.message);
+              handleOAuthFailure(res, config, "internal_error", err.message);
             }
           }
         );
@@ -136,88 +167,89 @@ export default (router: Router, config: Config) => {
     }
   );
 
-  // Simple error route
-  router.get("/auth/error", (req: Request, res: Response) => {
-    const { error } = req.query;
+  // Internal error route - redirects to failure URL
+  router.get(`${basePrefix}/error`, (req: Request, res: Response) => {
+    const { error, error_description } = req.query;
+    const errorMessage = error_description || error || "Authentication failed";
 
-    // Return HTML that communicates with parent window
-    res.send(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-          <title>Authentication Failed</title>
-      </head>
-      <body>
-          <script>
-              if (window.opener && !window.opener.closed) {
-                  window.opener.postMessage({
-                      type: 'OAUTH_ERROR',
-                      error: '${error || "Authentication failed"}'
-                  }, window.opener.location.origin);
-                  window.close();
-              }
-          </script>
-      </body>
-      </html>
-    `);
+    // Redirect to configured failure URL
+    const failureUrl = new URL(config.oauth2!.failureRedirect);
+    failureUrl.searchParams.set("error", (error as string) || "unknown_error");
+    failureUrl.searchParams.set("error_description", errorMessage as string);
+
+    res.redirect(failureUrl.toString());
   });
 };
 
-// Simple redirect to frontend with tokens
-const redirectToFrontend = (
+// Handle OAuth success
+const handleOAuthSuccess = (
   res: Response,
-  authResult: any,
-  redirectUri: string,
-  provider: string
+  config: Config,
+  providerName: string,
+  accessToken?: string,
+  refreshToken?: string,
+  user?: User
 ) => {
-  const url = new URL(redirectUri);
+  const successUrl = new URL(config.oauth2!.successRedirect);
 
-  // Add tokens to URL (frontend will remove them)
-  if (authResult.accessToken) {
-    url.searchParams.set("access_token", authResult.accessToken);
+  // Always add provider
+  successUrl.searchParams.set("provider", providerName);
+
+  // Add tokens to URL if configured
+  if (config.oauth2!.appendTokensInRedirect) {
+    if (accessToken) {
+      successUrl.searchParams.set("accessToken", accessToken);
+    }
+    if (refreshToken) {
+      successUrl.searchParams.set("refreshToken", refreshToken);
+    }
   }
-  if (authResult.refreshToken) {
-    url.searchParams.set("refresh_token", authResult.refreshToken);
+
+  // Add user info if available and tokens not appended (for session auth)
+  if (user && !config.oauth2!.appendTokensInRedirect) {
+    successUrl.searchParams.set("user", JSON.stringify(user));
   }
-  if (authResult.user) {
-    url.searchParams.set("user", JSON.stringify(authResult.user));
-  }
 
-  // Add metadata
-  url.searchParams.set("provider", provider);
-  url.searchParams.set("success", "true");
-
-  // Return HTML that sends tokens to parent window and closes
-  res.send(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Authentication Successful</title>
-    </head>
-    <body>
-        <script>
-            // Send tokens to parent window
-            if (window.opener && !window.opener.closed) {
-                window.opener.postMessage({
-                    type: 'OAUTH_SUCCESS',
-                    access_token: '${authResult.accessToken || ""}',
-                    refresh_token: '${authResult.refreshToken || ""}',
-                    user: ${
-                      authResult.user ? JSON.stringify(authResult.user) : "null"
-                    },
-                    provider: '${provider}'
-                }, window.opener.location.origin);
-            }
-
-            // Close popup
-            setTimeout(() => window.close(), 500);
-        </script>
-    </body>
-    </html>
-  `);
+  res.redirect(successUrl.toString());
 };
 
-// Simple error handler
-const handleOAuthError = (res: Response, error: string) => {
-  res.redirect(`/auth/error?error=${encodeURIComponent(error)}`);
+// Handle OAuth failure
+const handleOAuthFailure = (
+  res: Response,
+  config: Config,
+  error: string,
+  errorDescription?: string
+) => {
+  const failureUrl = new URL(config.oauth2!.failureRedirect);
+  failureUrl.searchParams.set("error", error);
+  if (errorDescription) {
+    failureUrl.searchParams.set("error_description", errorDescription);
+  }
+
+  res.redirect(failureUrl.toString());
+};
+
+// Set refresh token as HTTP-only cookie
+const setRefreshTokenCookie = (
+  res: Response,
+  refreshToken: string,
+  config: Config
+) => {
+  const cookieConfig = config.cookies || {};
+  // Fix: Use proper type checking for cookie config
+  const cookieName = (cookieConfig as any).name || "AuthRefreshToken";
+  const httpOnly = (cookieConfig as any).httpOnly ?? true;
+  const secure =
+    (cookieConfig as any).secure ?? process.env.NODE_ENV === "production";
+  const sameSite = (cookieConfig as any).sameSite || "Strict";
+  const maxAge = (cookieConfig as any).maxAge || 7 * 24 * 60 * 60 * 1000; // 7 days
+  const path = (cookieConfig as any).path || "/";
+
+  res.cookie(cookieName, refreshToken, {
+    httpOnly,
+    secure,
+    sameSite: sameSite as any,
+    maxAge,
+    path,
+  });
 };

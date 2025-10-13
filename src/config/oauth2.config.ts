@@ -1,6 +1,12 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import passport from "passport";
 import { Config, CustomProviderConfig } from "../interfaces/config.interface";
+import {
+  User,
+  OAuthUserProfile,
+  UserProvisionResult,
+} from "../interfaces/user.interface";
 
 export default (config: Config, logger: any) => {
   if (!config.oauth2?.enabled || !config.oauth2?.providers) {
@@ -8,9 +14,17 @@ export default (config: Config, logger: any) => {
     return;
   }
 
-  // Validate base configuration
-  if (!config.oauth2.baseURL) {
-    throw new Error("OAuth2 baseURL is required when OAuth2 is enabled");
+  // Validate required configuration
+  if (!config.oauth2.successRedirect) {
+    throw new Error("OAuth2 successRedirect is required");
+  }
+  if (!config.oauth2.failureRedirect) {
+    throw new Error("OAuth2 failureRedirect is required");
+  }
+  if (config.oauth2.autoProvision && !config.userService.createUser) {
+    throw new Error(
+      "UserService.createUser is required when autoProvision is enabled"
+    );
   }
 
   Object.entries(config.oauth2.providers).forEach(
@@ -20,10 +34,7 @@ export default (config: Config, logger: any) => {
           throw new Error(`Provider config missing for ${providerName}`);
         }
 
-        // Validate required fields
         validateProviderConfig(providerName, providerConfig);
-
-        // Setup the provider
         setupOauth2Provider(providerName, providerConfig, config, logger);
       } catch (error: any) {
         logger.error(
@@ -57,25 +68,22 @@ const validateProviderConfig = (
   }
 };
 
-// Normalize callback URL to absolute URL
+// Normalize callback URL
 const normalizeCallbackURL = (
   callbackURL: string | undefined,
   baseURL: string,
   prefix: string,
   providerName: string
 ): string => {
-  // If no callback URL provided, generate default
   if (!callbackURL) {
     return `${baseURL}${prefix}/${providerName}/callback`;
   }
-
-  // If already absolute URL, return as-is
   if (callbackURL.startsWith("http://") || callbackURL.startsWith("https://")) {
     return callbackURL;
   }
-
-  // Relative URL - make it absolute
-  const cleanPath = callbackURL.startsWith("/") ? callbackURL : `/${callbackURL}`;
+  const cleanPath = callbackURL.startsWith("/")
+    ? callbackURL
+    : `/${callbackURL}`;
   return `${baseURL}${cleanPath}`;
 };
 
@@ -123,7 +131,7 @@ const setupOauth2Provider = (
   // Use custom verify callback or create default one
   const verifyCallback =
     providerConfig.customVerifyCallback ||
-    createCustomVerifyCallback(providerName, providerConfig, config, logger);
+    createVerifyCallback(providerName, providerConfig, config, logger);
 
   try {
     // Create and register strategy
@@ -147,8 +155,8 @@ const setupOauth2Provider = (
   }
 };
 
-// Create custom verify callback for OAuth 2.0
-const createCustomVerifyCallback = (
+// verify callback with auto-provisioning
+const createVerifyCallback = (
   providerName: string,
   providerConfig: CustomProviderConfig,
   config: Config,
@@ -163,9 +171,20 @@ const createCustomVerifyCallback = (
     try {
       logger.info(`${providerName} OAuth 2.0 strategy triggered`);
 
-      // Extract email using custom mapping or default
-      const emailPath = providerConfig.profileMapping?.email || "emails[0].value";
+      // Extract user information using profile mapping or defaults
+      const emailPath =
+        providerConfig.profileMapping?.email || "emails[0].value";
+      const idPath = providerConfig.profileMapping?.id || "id";
+      const namePath = providerConfig.profileMapping?.name || "displayName";
+
       const email = getNestedValue(profile, emailPath);
+      const providerId = getNestedValue(profile, idPath) || profile.id;
+      const name = getNestedValue(profile, namePath);
+      const login = getNestedValue(profile, "login"); // GitHub style
+
+      // Generate username: email > login > provider:providerId
+      const username =
+        email || login || `${providerName}:${providerId || Date.now()}`;
 
       if (!email) {
         logger.warn(`Email not found in ${providerName} profile`, {
@@ -179,12 +198,51 @@ const createCustomVerifyCallback = (
       logger.info(
         `Attempting to load user with email: ${email} from ${providerName}`
       );
-      const user = await config.userService.loadUser(email);
+      let user = await config.userService.loadUser(email);
+
+      // Auto-provision if user doesn't exist and autoProvision is enabled
+      if (!user && config.oauth2?.autoProvision) {
+        logger.info(`Auto-provisioning new user for email: ${email}`);
+
+        const userProfile: OAuthUserProfile = {
+          provider: providerName,
+          providerId: providerId?.toString() || "",
+          username,
+          email,
+          login: login || "",
+          attributes: profile._json || profile,
+        };
+
+        if (config.userService.createUser) {
+          user = await config.userService.createUser(userProfile);
+
+          // Apply default role if user has no grants
+          if (
+            config.oauth2.defaultRole &&
+            (!user.grants || user.grants.length === 0)
+          ) {
+            user.grants = [config.oauth2.defaultRole];
+            logger.info(
+              `Assigned default role to new user: ${config.oauth2.defaultRole}`
+            );
+          }
+        } else {
+          logger.warn(
+            "Auto-provisioning enabled but createUser method not provided"
+          );
+        }
+      }
 
       if (!user) {
-        logger.warn(`User not found for email: ${email} from ${providerName}`);
+        logger.warn(
+          `User not found for email: ${email} from ${providerName} and auto-provisioning disabled`
+        );
         return done(null, false, { message: "User not authorized" });
       }
+
+      // Add provider information to user object for later use
+      user.provider = providerName;
+      user.providerId = providerId;
 
       logger.info(
         `User successfully authenticated via ${providerName}: ${email}`
@@ -200,14 +258,11 @@ const createCustomVerifyCallback = (
   };
 };
 
-// Utility function to get nested values from objects
+// Utility function to get nested values from objects (unchanged)
 const getNestedValue = (obj: any, path: string): any => {
   if (!path) return undefined;
-
   try {
-    // Handle array notation like 'emails[0].value'
     const normalizedPath = path.replace(/\[(\d+)\]/g, ".$1");
-
     return normalizedPath.split(".").reduce((current, key) => {
       if (current && typeof current === "object") {
         return current[key];

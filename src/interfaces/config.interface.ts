@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { OAuth2Providers } from "./oauth2.type";
-import { User } from "./user.interface";
+import { OAuthUserProfile, User } from "./user.interface";
 
 export interface SessionConfig {
   enabled: boolean;
@@ -82,12 +82,32 @@ export interface CustomProviderConfig {
 }
 
 export interface OAuth2Config {
+  refreshTokenParam: string;
+  accessTokenParam: string;
   enabled: boolean;
   baseURL?: string;
   prefix?: string;
+  successRedirect: string; // Required for redirect flow
+  failureRedirect: string; // Required for redirect flow
+  autoProvision?: boolean; // Create users if they don't exist
+  defaultRole?: string; // Default role for new users
+  setRefreshCookie?: boolean; // Set refresh token as HTTP cookie
+  appendTokensInRedirect?: boolean; // Include tokens in redirect URL
+  includeAuthorities?: boolean; // Include roles/grants in tokens
+  issueJwt?: boolean; // Whether to issue JWT tokens
   providers: {
     [key in OAuth2Providers]?: CustomProviderConfig;
   };
+}
+
+export interface CookieConfig {
+  enabled: boolean;
+  name?: string;
+  httpOnly?: boolean;
+  secure?: boolean;
+  sameSite?: "Strict" | "Lax" | "None";
+  maxAge?: number;
+  path?: string;
 }
 
 export interface Config {
@@ -95,8 +115,10 @@ export interface Config {
   session?: SessionConfig;
   twoFA?: TwoFAConfig;
   oauth2?: OAuth2Config;
+  cookies?: CookieConfig; // Add this line
   userService: {
     loadUser: (email: string) => Promise<User | null | undefined>;
+    createUser?: (profile: OAuthUserProfile) => Promise<User>;
   };
   passwordChecker: (
     inputPassword: string,
