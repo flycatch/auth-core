@@ -627,19 +627,36 @@ describe("AuthCore", () => {
     beforeEach(() => {
       app.use(
         config({
-          jwt: { enabled: true, secret: jwtSecret, expiresIn: "1h" },
+          jwt: {
+            enabled: true,
+            secret: jwtSecret,
+            expiresIn: "1h",
+            refresh: true,
+            refreshExpiresIn: "7d",
+          },
           oauth2: {
             enabled: true,
             baseURL: "http://localhost:3000",
             prefix: "/auth/oauth",
+            successRedirect: "http://localhost:3000/oauth-success",
+            failureRedirect: "http://localhost:3000/oauth-failure",
+            autoProvision: false, // Don't create users in tests
+            setRefreshCookie: false, // Disable cookies for simpler testing
+            appendTokensInRedirect: true, // Include tokens in URL for testing
+            includeAuthorities: true,
+            issueJwt: true,
             providers: {
               google: {
                 clientID: "mock-client-id",
                 clientSecret: "mock-client-secret",
                 callbackURL: "/auth/oauth/google/callback",
                 strategy: MockStrategy,
+                scope: ["profile", "email"],
               },
             },
+          },
+          cookies: {
+            enabled: false, // Disable cookies for tests
           },
           twoFA: {
             enabled: false,
@@ -647,12 +664,11 @@ describe("AuthCore", () => {
           userService: {
             loadUser: async (email: string) =>
               email === "test@example.com" ? createMockUser(email) : null,
+            createUser: async (profile: any) => createMockUser(profile.email), // Required but won't be called with autoProvision: false
           },
+          passwordChecker: async (input: string, stored: string) => true,
           logs: false,
         })
-      );
-      app.get("/protected", verify(), (req, res) =>
-        res.json({ message: "Access granted", user: req.user })
       );
     });
 
@@ -661,25 +677,34 @@ describe("AuthCore", () => {
       expect(response.status).toBe(302);
       expect(passport.authenticate).toHaveBeenCalledWith(
         "google",
-        expect.any(Object)
+        expect.objectContaining({
+          scope: ["profile", "email"],
+        })
       );
     });
 
     test("should handle Google OAuth callback", async () => {
-      const response = await request(app).get(
-        "/auth/oauth/google/callback?code=mock-code"
+      const response = await request(app)
+        .get("/auth/oauth/google/callback?code=mock-code")
+        .redirects(0); // Prevent automatic redirect following
+
+      expect(response.status).toBe(302);
+      expect(response.header.location).toContain(
+        "http://localhost:3000/oauth-success"
       );
-      expect(response.status).toBe(200);
-      expect(response.body).toHaveProperty("data");
-      expect(response.body.data[0]).toHaveProperty("accessToken");
+      expect(response.header.location).toContain("provider=google");
     });
 
     test("should reject invalid OAuth code", async () => {
       const response = await request(app)
         .get("/auth/oauth/google/callback?error=access_denied")
-        .redirects(1);
-      expect(response.status).toBe(400);
-      expect(response.body.error).toBe("Authentication failed");
+        .redirects(0);
+
+      expect(response.status).toBe(302);
+      expect(response.header.location).toContain(
+        "http://localhost:3000/oauth-failure"
+      );
+      expect(response.header.location).toContain("error=access_denied");
     });
   });
 
