@@ -62,9 +62,17 @@ app.use(
       cookie: { secure: false, maxAge: 60000 },
     },
     oauth2: {
-      enabled: false,
+      enabled: true,
       baseURL: "http://localhost:3000",
       prefix: "/auth",
+      successRedirect: "http://localhost:3000/oauth-success",
+      failureRedirect: "http://localhost:3000/oauth-failure",
+      autoProvision: true,
+      defaultRole: "ROLE_USER",
+      setRefreshCookie: true,
+      appendTokensInRedirect: false,
+      includeAuthorities: true,
+      issueJwt: true,
       providers: {
         google: {
           clientID: "GOOGLE_CLIENT_ID",
@@ -73,6 +81,15 @@ app.use(
           scope: ["profile", "email"],
         },
       },
+    },
+    cookies: {
+      enabled: true,
+      name: "AuthRefreshToken",
+      httpOnly: true,
+      secure: false,
+      sameSite: "Strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: "/",
     },
     twoFA: {
       enabled: false,
@@ -92,6 +109,14 @@ app.use(
     },
     userService: {
       loadUser: async (email) => userRepository.find(email),
+      createUser: async (profile) => {
+        return {
+          id: "new-user-id",
+          email: profile.email,
+          username: profile.username,
+          grants: [profile.defaultRole || "ROLE_USER"],
+        };
+      },
     },
     passwordChecker: async (inputPassword, storedPassword) =>
       bcrypt.compare(inputPassword, storedPassword),
@@ -182,6 +207,14 @@ oauth2: {
   enabled: true,
   baseURL: "http://localhost:3000",
   prefix: "/auth",
+  successRedirect: "http://localhost:3000/oauth-success",
+  failureRedirect: "http://localhost:3000/oauth-failure",
+  autoProvision: true,
+  defaultRole: "ROLE_USER",
+  setRefreshCookie: true,
+  appendTokensInRedirect: false,
+  includeAuthorities: true,
+  issueJwt: true,
   providers: {
     google: {
       clientID: "GOOGLE_CLIENT_ID",
@@ -201,7 +234,37 @@ oauth2: {
 - **enabled**: Enables OAuth 2.0 authentication.
 - **baseURL**: Base URL for callback redirects.
 - **prefix**: Route prefix for OAuth authentication endpoints.
+- **successRedirect**: URL to redirect after successful OAuth authentication.
+- **failureRedirect**: URL to redirect after failed OAuth authentication.
+- **autoProvision**: Automatically create users if they don't exist.
+- **defaultRole**: Default role assigned to new users.
+- **setRefreshCookie**: Set refresh token as HTTP-only cookie.
+- **appendTokensInRedirect**: Include tokens in redirect URL.
+- **includeAuthorities**: Include user grants in JWT tokens.
+- **issueJwt**: Issue JWT tokens for OAuth users.
 - **providers**: Supported providers (e.g., Google, GitHub).
+
+### **Cookie Configuration**
+
+```javascript
+cookies: {
+  enabled: true,
+  name: "AuthRefreshToken",
+  httpOnly: true,
+  secure: false,
+  sameSite: "Strict",
+  maxAge: 7 * 24 * 60 * 60 * 1000,
+  path: "/",
+}
+```
+
+- **enabled**: Enables cookie support.
+- **name**: Cookie name for refresh token.
+- **httpOnly**: Prevents client-side JavaScript access.
+- **secure**: Only send over HTTPS.
+- **sameSite**: CSRF protection setting.
+- **maxAge**: Cookie expiration time.
+- **path**: Cookie path.
 
 ### **Two-Factor Authentication**
 
@@ -243,8 +306,20 @@ twoFA: {
 ```javascript
 userService: {
   loadUser: async (email) => userRepository.find(email),
+  createUser: async (profile) => {
+    // Create new user during OAuth flow
+    return {
+      id: "new-user-id",
+      email: profile.email,
+      username: profile.username,
+      grants: [profile.defaultRole || "ROLE_USER"],
+    };
+  },
 }
 ```
+
+- **loadUser**: Load user by email (required).
+- **createUser**: Create new user during OAuth auto-provisioning (required for OAuth).
 
 ### **Custom Password Checker**
 
@@ -307,8 +382,9 @@ All endpoints use the configured prefix. Default prefixes shown below:
 
 1. User initiates OAuth flow with provider via `/auth/{provider}`.
 2. After successful authentication, provider redirects to `/auth/{provider}/callback`.
-3. Server returns JWT tokens or creates a session.
-4. Subsequent requests use JWT or session authentication.
+3. Server processes authentication and auto-creates user if enabled.
+4. Server redirects to success URL with tokens as cookies.
+5. Subsequent requests use JWT or session authentication.
 
 ## Logout Behavior
 
