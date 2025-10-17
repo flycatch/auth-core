@@ -7,21 +7,29 @@ import { createJwtTokens } from "../utils/jwt";
 import { User } from "../interfaces/user.interface";
 import { createSessionPayload } from "../utils/session";
 
+/**
+ * OAuth2 Routes
+ * Sets up authentication and callback routes for each configured OAuth provider
+ */
 export default (router: Router, config: Config) => {
   if (!config.oauth2?.enabled) return;
 
   const logger = createLogger(config);
   const basePrefix = config.oauth2.prefix || "/auth";
 
-  // Routes for Custom OAuth Strategies
+  // Ensure at least one provider is configured
   if (!config.oauth2?.providers) return;
 
+  // Iterate over each OAuth provider to setup routes
   Object.entries(config.oauth2.providers).forEach(
     ([providerName, providerConfig]) => {
       try {
         logger.info(`Setting up routes for custom provider: ${providerName}`);
 
-        // Auth initiation route - redirects to provider
+        /**
+         * Auth initiation route
+         * Redirects user to provider's OAuth consent screen
+         */
         router.get(
           `${basePrefix}/${providerName}`,
           (req: Request, res: Response, next: NextFunction) => {
@@ -35,9 +43,13 @@ export default (router: Router, config: Config) => {
           }
         );
 
-        // Auth callback route - handles provider response
+        /**
+         * Auth callback route
+         * Handles provider's response after user authentication
+         */
         router.get(
           `${basePrefix}/${providerName}/callback`,
+          // Check for provider error in query params
           (req: Request, res: Response, next: NextFunction) => {
             const { error, error_description } = req.query;
 
@@ -55,11 +67,11 @@ export default (router: Router, config: Config) => {
 
             next();
           },
-          // Passport authentication
+          // Passport authentication middleware
           (req: Request, res: Response, next: NextFunction) => {
             passport.authenticate(providerName, {
               session: false,
-              failureRedirect: `${basePrefix}/error`, // Use internal error handler
+              failureRedirect: `${basePrefix}/error`,
             } as any)(req, res, next);
           },
           // Success handler
@@ -81,25 +93,28 @@ export default (router: Router, config: Config) => {
 
               const user = req.user as User;
 
-              // Generate tokens based on configuration
+              // Initialize auth result variables
               let authResult;
               let accessToken: string | undefined;
               let refreshToken: string | undefined;
 
+              /**
+               * JWT Authentication
+               * Generates access and refresh tokens if configured
+               */
               if (config.oauth2?.issueJwt !== false && config.jwt?.enabled) {
-                // Include authorities/grants in JWT if configured
                 const jwtPayload: any = {
                   provider: user.provider,
                   email: user.email,
                 };
 
+                // Include authorities/grants if configured
                 if (
                   config.oauth2 &&
                   config.oauth2.includeAuthorities &&
                   user.grants
                 ) {
                   jwtPayload.grants = user.grants;
-                  // Extract roles if needed
                   const roles = user.grants.filter((grant: string | number) =>
                     String(grant).startsWith("ROLE_")
                   );
@@ -108,12 +123,16 @@ export default (router: Router, config: Config) => {
                   }
                 }
 
-                // Use the original 2-parameter function
                 authResult = createJwtTokens(config.jwt, user);
                 accessToken = authResult.accessToken;
                 refreshToken = authResult.refreshToken;
 
                 logger.info("JWT tokens created for OAuth user");
+
+                /**
+                 * Session-based Authentication
+                 * Used if JWT is not configured but sessions are enabled
+                 */
               } else if (config.session?.enabled) {
                 authResult = createSessionPayload(user);
                 req.session.user = authResult;
@@ -128,7 +147,9 @@ export default (router: Router, config: Config) => {
                 );
               }
 
-              // Set refresh token as HTTP-only cookie if enabled
+              /**
+               * Optionally set refresh token as HTTP-only cookie
+               */
               if (
                 config.oauth2?.setRefreshCookie &&
                 refreshToken &&
@@ -138,7 +159,7 @@ export default (router: Router, config: Config) => {
                 logger.info("Refresh token set as HTTP-only cookie");
               }
 
-              // Redirect to success URL
+              // Redirect to configured success URL
               return handleOAuthSuccess(
                 res,
                 config,
@@ -167,12 +188,14 @@ export default (router: Router, config: Config) => {
     }
   );
 
-  // Internal error route - redirects to failure URL
+  /**
+   * Internal error route
+   * Redirects to configured failure URL with error details
+   */
   router.get(`${basePrefix}/error`, (req: Request, res: Response) => {
     const { error, error_description } = req.query;
     const errorMessage = error_description || error || "Authentication failed";
 
-    // Redirect to configured failure URL
     const failureUrl = new URL(config.oauth2!.failureRedirect);
     failureUrl.searchParams.set("error", (error as string) || "unknown_error");
     failureUrl.searchParams.set("error_description", errorMessage as string);
@@ -181,7 +204,10 @@ export default (router: Router, config: Config) => {
   });
 };
 
-// Handle OAuth success
+/**
+ * Handle OAuth success
+ * Redirects user to success URL with optional tokens or user info
+ */
 const handleOAuthSuccess = (
   res: Response,
   config: Config,
@@ -192,10 +218,10 @@ const handleOAuthSuccess = (
 ) => {
   const successUrl = new URL(config.oauth2!.successRedirect);
 
-  // Always add provider
+  // Always include provider name
   successUrl.searchParams.set("provider", providerName);
 
-  // Add tokens to URL if configured
+  // Append tokens in redirect if configured
   if (config.oauth2!.appendTokensInRedirect) {
     if (accessToken) {
       successUrl.searchParams.set("accessToken", accessToken);
@@ -205,7 +231,7 @@ const handleOAuthSuccess = (
     }
   }
 
-  // Add user info if available and tokens not appended (for session auth)
+  // Include user info for session-based auth
   if (user && !config.oauth2!.appendTokensInRedirect) {
     successUrl.searchParams.set("user", JSON.stringify(user));
   }
@@ -213,7 +239,10 @@ const handleOAuthSuccess = (
   res.redirect(successUrl.toString());
 };
 
-// Handle OAuth failure
+/**
+ * Handle OAuth failure
+ * Redirects user to failure URL with error details
+ */
 const handleOAuthFailure = (
   res: Response,
   config: Config,
@@ -229,14 +258,15 @@ const handleOAuthFailure = (
   res.redirect(failureUrl.toString());
 };
 
-// Set refresh token as HTTP-only cookie
+/**
+ * Set refresh token as HTTP-only cookie
+ */
 const setRefreshTokenCookie = (
   res: Response,
   refreshToken: string,
   config: Config
 ) => {
   const cookieConfig = config.cookies || {};
-  // Fix: Use proper type checking for cookie config
   const cookieName = (cookieConfig as any).name || "AuthRefreshToken";
   const httpOnly = (cookieConfig as any).httpOnly ?? true;
   const secure =

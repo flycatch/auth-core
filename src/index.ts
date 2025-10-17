@@ -14,22 +14,31 @@ import oauth2Config from "./config/oauth2.config";
 // Configuration storage
 let configurations: Config = {} as Config;
 
-// Function to initialize configurations and set up routes
+/**
+ * Initializes the authentication module with given configuration.
+ * Sets up JWT, Session, and OAuth2 routes based on config.
+ *
+ * @param {Config} config - Authentication configuration object.
+ * @returns {Router} Express router with configured auth routes.
+ * @throws {Error} Throws if invalid or incomplete configuration is provided.
+ */
 function config(config: Config): Router {
   const jwtEnabled = config.jwt?.enabled ?? false;
   const sessionEnabled = config.session?.enabled ?? false;
+
   if (jwtEnabled && sessionEnabled) {
     throw new Error(
       "Cannot enable both JWT and Session authentication simultaneously."
     );
   }
+
   if (!jwtEnabled && !sessionEnabled) {
     throw new Error(
       "At least one of JWT or Session authentication must be enabled."
     );
   }
 
-  // Validate required settings (expand as needed for other configs like OAuth, 2FA)
+  // Validate required settings
   if (jwtEnabled && !config.jwt?.secret) {
     throw new Error("JWT secret is required when JWT is enabled.");
   }
@@ -64,22 +73,23 @@ function config(config: Config): Router {
   configurations = config;
   const logger = createLogger(config);
   logger.info("AuthCore module initialized");
+
   const router = express.Router();
 
-  // Set up routes if JWT is enabled
+  // Set up JWT routes
   if (config.jwt && config.jwt.enabled) {
     jwtRoutes(router, configurations);
     logger.info("JWT routes enabled");
   }
 
-  // Set up routes if session is enabled
+  // Set up Session routes
   if (config.session && config.session.enabled) {
     setupSession(router, configurations);
     sessionRoutes(router, configurations);
     logger.info("Session routes enabled");
   }
 
-  // Set up OAuth if enabled - SETUP BEFORE ROUTES
+  // Set up OAuth2 routes
   if (config.oauth2?.enabled) {
     router.use(passport.initialize());
     oauth2Config(config, logger);
@@ -90,7 +100,12 @@ function config(config: Config): Router {
   return router;
 }
 
-// Middleware function for verifying authentication
+/**
+ * Middleware to verify authentication and optionally check user permissions.
+ *
+ * @param {string} [permission] - Optional permission string required for access.
+ * @returns {(req: Request, res: Response, next: NextFunction) => void} Middleware function.
+ */
 function verify(
   permission?: string
 ): (req: Request, res: Response, next: NextFunction) => void {
@@ -98,7 +113,7 @@ function verify(
     const { jwt, session } = configurations;
     const logger = createLogger(configurations);
 
-    // Ensure user has permissions
+    // Function to check user permissions
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const checkPermission = (user: any) => {
       if (permission && (!user.grants || !user.grants.includes(permission))) {
@@ -116,6 +131,7 @@ function verify(
       return next();
     };
 
+    // JWT verification
     if (jwt && jwt.enabled) {
       return jwtMiddleware(configurations)(req, res, (err) => {
         if (err) {
@@ -124,6 +140,8 @@ function verify(
         }
         return checkPermission(req.user);
       });
+
+      // Session verification
     } else if (session && session.enabled) {
       return sessionMiddleware(configurations)(req, res, (err) => {
         if (err) {

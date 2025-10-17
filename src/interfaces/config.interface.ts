@@ -2,6 +2,9 @@
 import { OAuth2Providers } from "./oauth2.type";
 import { OAuthUserProfile, User } from "./user.interface";
 
+/**
+ * Configuration options for Express session management.
+ */
 export interface SessionConfig {
   enabled: boolean;
   secret?: string;
@@ -9,69 +12,88 @@ export interface SessionConfig {
   resave?: boolean;
   saveUninitialized?: boolean;
   cookie?: {
-    secure?: boolean;
-    maxAge?: number;
+    secure?: boolean; // Indicates if cookies should be sent only over HTTPS
+    maxAge?: number; // Maximum age of the cookie in milliseconds
   };
 }
 
+/**
+ * Supported expiration formats for JWT tokens.
+ * Accepts a number (milliseconds) or a string (e.g., "15m", "1h", "7d").
+ */
 type expiresIn = `${number}${"s" | "m" | "h" | "d" | "w" | "y"}` | number;
+
+/**
+ * Configuration for JWT authentication and token handling.
+ */
 export interface JwtConfig {
   enabled: boolean;
-  secret?: string;
-  expiresIn?: expiresIn;
-  refresh?: boolean;
-  refreshExpiresIn?: expiresIn;
-  prefix?: string;
+  secret?: string; // Secret key for signing JWT tokens
+  expiresIn?: expiresIn; // Access token expiry time
+  refresh?: boolean; // Whether to enable refresh token generation
+  refreshExpiresIn?: expiresIn; // Refresh token expiry time
+  prefix?: string; // Optional token prefix (e.g., 'Bearer')
+
   // Enhanced logout and security options
   revokeOnRefresh?: boolean; // Whether to blacklist refresh token when creating new tokens
   tokenBlacklist?: {
     // Token blacklist configuration - OPTIONAL
     enabled?: boolean; // If false or undefined, logout will be client-side only
     storageService?: {
-      add: (token: string, expiresAt?: Date) => Promise<void> | void;
-      has: (token: string) => Promise<boolean> | boolean;
-      remove: (token: string) => Promise<void> | void;
-      clear: () => Promise<void> | void;
+      add: (token: string, expiresAt?: Date) => Promise<void> | void; // Add token to blacklist
+      has: (token: string) => Promise<boolean> | boolean; // Check if token is blacklisted
+      remove: (token: string) => Promise<void> | void; // Remove token from blacklist
+      clear: () => Promise<void> | void; // Clear all blacklisted tokens
     };
     // Callback when user logs out of all sessions (for custom cleanup)
     onLogoutAll?: (userId: string | number) => Promise<void> | void;
   };
 }
 
+/**
+ * Configuration for Two-Factor Authentication (2FA) using OTP.
+ */
 export interface TwoFAConfig {
-  enabled: boolean;
-  otpLength?: number;
-  otpType?: "numeric" | "alphanumeric";
-  otpExpiresIn?: expiresIn;
-  transport?: (otp: string, user: User) => Promise<void>;
+  enabled: boolean; // Enable or disable 2FA
+  otpLength?: number; // Length of the generated OTP
+  otpType?: "numeric" | "alphanumeric"; // Type of OTP to generate
+  otpExpiresIn?: expiresIn; // Expiration duration of OTP
+  transport?: (otp: string, user: User) => Promise<void>; // Method to send OTP to user
   storeOtp: (
     userId: string | number,
     otp: string,
     expiresInMs: number
-  ) => Promise<void>;
-  getStoredOtp: (userId: string | number) => Promise<string | null>;
-  clearOtp?: (userId: string | number) => Promise<void>;
-  onOtpGenerated?: (otp: string, user: User) => Promise<void>;
-  onOtpSent?: (user: User) => Promise<void>;
-  onVerifySuccess?: (user: User) => Promise<void>;
-  onVerifyFail?: (user: User, error: any) => Promise<void>;
+  ) => Promise<void>; // Method to store OTP
+  getStoredOtp: (userId: string | number) => Promise<string | null>; // Retrieve stored OTP
+  clearOtp?: (userId: string | number) => Promise<void>; // Clear OTP after verification
+  onOtpGenerated?: (otp: string, user: User) => Promise<void>; // Callback after OTP generation
+  onOtpSent?: (user: User) => Promise<void>; // Callback after OTP is sent
+  onVerifySuccess?: (user: User) => Promise<void>; // Callback on successful OTP verification
+  onVerifyFail?: (user: User, error: any) => Promise<void>; // Callback on OTP verification failure
 }
 
+/**
+ * Configuration for an individual OAuth 2.0 provider.
+ */
 export interface CustomProviderConfig {
-  clientID: string;
-  clientSecret: string;
-  callbackURL?: string;
-  scope?: string[];
+  clientID: string; // OAuth2 client ID
+  clientSecret: string; // OAuth2 client secret
+  callbackURL?: string; // Callback URL for OAuth2 redirect
+  scope?: string[]; // Scopes requested from the provider
+
   // Strategy class or constructor function for OAuth 2.0
   strategy: any;
+
   // Custom configuration specific to the provider
   customConfig?: Record<string, any>;
+
   // Custom profile field mappings
   profileMapping?: {
-    email?: string; // path to email in profile
-    id?: string; // path to user id in profile
-    name?: string; // path to name in profile
+    email?: string; // Path to email in profile
+    id?: string; // Path to user id in profile
+    name?: string; // Path to name in profile
   };
+
   // Custom verify callback for OAuth 2.0
   customVerifyCallback?: (
     accessToken: string,
@@ -81,48 +103,65 @@ export interface CustomProviderConfig {
   ) => void;
 }
 
+/**
+ * Global configuration for OAuth 2.0 authentication.
+ */
 export interface OAuth2Config {
-  refreshTokenParam: string;
-  accessTokenParam: string;
-  enabled: boolean;
-  baseURL?: string;
-  prefix?: string;
-  successRedirect: string; // Required for redirect flow
-  failureRedirect: string; // Required for redirect flow
+  refreshTokenParam: string; // Query parameter name for refresh token
+  accessTokenParam: string; // Query parameter name for access token
+  enabled: boolean; // Whether OAuth2 is enabled
+  baseURL?: string; // Base URL for OAuth2 callback routes
+  prefix?: string; // API prefix for OAuth2 routes
+  successRedirect: string; // Redirect URL on successful login
+  failureRedirect: string; // Redirect URL on failed login
   autoProvision?: boolean; // Create users if they don't exist
-  defaultRole?: string; // Default role for new users
-  setRefreshCookie?: boolean; // Set refresh token as HTTP cookie
-  appendTokensInRedirect?: boolean; // Include tokens in redirect URL
+  defaultRole?: string; // Default role assigned to new users
+  setRefreshCookie?: boolean; // Store refresh token as an HTTP cookie
+  appendTokensInRedirect?: boolean; // Append tokens in redirect URL
   includeAuthorities?: boolean; // Include roles/grants in tokens
   issueJwt?: boolean; // Whether to issue JWT tokens
+
+  // List of configured OAuth2 providers
   providers: {
     [key in OAuth2Providers]?: CustomProviderConfig;
   };
 }
 
+/**
+ * Configuration for cookies used in authentication or sessions.
+ */
 export interface CookieConfig {
-  enabled: boolean;
-  name?: string;
-  httpOnly?: boolean;
-  secure?: boolean;
-  sameSite?: "Strict" | "Lax" | "None";
-  maxAge?: number;
-  path?: string;
+  enabled: boolean; // Enable or disable cookie-based auth
+  name?: string; // Cookie name
+  httpOnly?: boolean; // Prevent access to cookies via JavaScript
+  secure?: boolean; // Send cookies only over HTTPS
+  sameSite?: "Strict" | "Lax" | "None"; // Cookie SameSite policy
+  maxAge?: number; // Cookie expiry time in milliseconds
+  path?: string; // Cookie path
 }
 
+/**
+ * Root application configuration interface combining
+ * authentication, session, OAuth2, and related services.
+ */
 export interface Config {
-  jwt?: JwtConfig;
-  session?: SessionConfig;
-  twoFA?: TwoFAConfig;
-  oauth2?: OAuth2Config;
-  cookies?: CookieConfig; // Add this line
+  jwt?: JwtConfig; // JWT configuration
+  session?: SessionConfig; // Session configuration
+  twoFA?: TwoFAConfig; // Two-Factor Authentication configuration
+  oauth2?: OAuth2Config; // OAuth 2.0 configuration
+  cookies?: CookieConfig; // Cookie configuration
+
+  // Service for loading and creating users
   userService: {
-    loadUser: (email: string) => Promise<User | null | undefined>;
-    createUser?: (profile: OAuthUserProfile) => Promise<User>;
+    loadUser: (email: string) => Promise<User | null | undefined>; // Fetch user by email
+    createUser?: (profile: OAuthUserProfile) => Promise<User>; // Create new user from OAuth profile
   };
+
+  // Method to compare passwords
   passwordChecker: (
     inputPassword: string,
     storedPassword: string
   ) => Promise<boolean>;
-  logs: boolean;
+
+  logs: boolean; // Enable or disable detailed logging
 }

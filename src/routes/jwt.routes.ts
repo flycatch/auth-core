@@ -11,56 +11,47 @@ import twoFactorAuth, {
   OtpExpiredError,
   TransportNotFoundError,
 } from "../utils/two-factor-auth";
+import {
+  addToBlacklist,
+  isInBlacklist,
+  setBlacklistStorage,
+} from "../utils/jwt-blacklist";
 
-// Token blacklist management - only used if enabled
+/**
+ * In-memory token blacklist
+ * Used only if no custom storage is configured
+ */
 const tokenBlacklist = new Set<string>();
 
-// Helper functions for blacklist management
+/**
+ * Add a token to the in-memory blacklist
+ * @param token JWT token string
+ */
 export const blacklistToken = (token: string): void => {
   tokenBlacklist.add(token);
 };
 
+/**
+ * Check if a token exists in the in-memory blacklist
+ * @param token JWT token string
+ * @returns boolean indicating if token is blacklisted
+ */
 export const isTokenBlacklisted = (token: string): boolean => {
   return tokenBlacklist.has(token);
 };
 
+/**
+ * Clear all tokens from the in-memory blacklist
+ */
 export const clearBlacklist = (): void => {
   tokenBlacklist.clear();
 };
 
-// Custom blacklist storage interface
-interface BlacklistStorage {
-  add: (token: string, expiresAt?: Date) => Promise<void> | void;
-  has: (token: string) => Promise<boolean> | boolean;
-  remove: (token: string) => Promise<void> | void;
-  clear: () => Promise<void> | void;
-}
-
-let blacklistStorage: BlacklistStorage | null = null;
-
-export const setBlacklistStorage = (storage: BlacklistStorage): void => {
-  blacklistStorage = storage;
-};
-
-// Universal blacklist functions that work with custom or default storage
-const addToBlacklist = async (
-  token: string,
-  expiresAt?: Date
-): Promise<void> => {
-  if (blacklistStorage) {
-    await blacklistStorage.add(token, expiresAt);
-  } else {
-    blacklistToken(token);
-  }
-};
-
-const isInBlacklist = async (token: string): Promise<boolean> => {
-  if (blacklistStorage) {
-    return await blacklistStorage.has(token);
-  }
-  return isTokenBlacklisted(token);
-};
-
+/**
+ * JWT Routes
+ * @param router Express router
+ * @param config Application configuration
+ */
 export default (router: Router, config: Config) => {
   if (!config.jwt) {
     throw new Error("JWT not configured");
@@ -68,12 +59,16 @@ export default (router: Router, config: Config) => {
 
   const logger = createLogger(config);
   router.use(express.json());
+
   const prefix = config.jwt.prefix || "/auth/jwt";
   const isBlacklistEnabled = config.jwt.tokenBlacklist?.enabled ?? false;
 
   const { initiate2fa, verifyOtp } = twoFactorAuth(config.twoFA);
 
-  // Login Route
+  /**
+   * Login route
+   * Handles normal login or 2FA-enabled login
+   */
   if (!config.twoFA?.enabled) {
     router.post(`${prefix}/login`, async (req: Request, res: Response) => {
       if (!config.jwt) {
@@ -108,7 +103,7 @@ export default (router: Router, config: Config) => {
           return res.status(401).json(apiResponse(401, "Login Failed", false));
         }
 
-        // Create jwt tokens
+        // Create JWT tokens
         const jwtTokens = createJwtTokens(config.jwt, user);
         logger.info(`Login successful for user: ${username}`);
 
@@ -119,6 +114,9 @@ export default (router: Router, config: Config) => {
       }
     });
   } else {
+    /**
+     * 2FA Login Route
+     */
     router.post(`${prefix}/login`, async (req: Request, res: Response) => {
       try {
         if (!config.twoFA || !config.twoFA.enabled) {
@@ -164,6 +162,9 @@ export default (router: Router, config: Config) => {
       }
     });
 
+    /**
+     * 2FA Verify Route
+     */
     router.post(`${prefix}/verify`, async (req: Request, res: Response) => {
       const { otp, email } = req.body;
       if (!otp || !email) {
@@ -192,7 +193,6 @@ export default (router: Router, config: Config) => {
         }
 
         const tokens = createJwtTokens(config.jwt, user);
-
         logger.info(`JWT Login Succesful`);
         res.json(
           apiResponse(201, "Two Factor Oath Successful", true, [tokens])
@@ -208,7 +208,10 @@ export default (router: Router, config: Config) => {
     });
   }
 
-  // Refresh Token Route
+  /**
+   * Refresh Token Route
+   * Generates new access token using valid refresh token
+   */
   if (config.jwt.refresh) {
     router.post(`${prefix}/refresh`, async (req, res) => {
       // Ensure JWT refresh is enabled in the config
@@ -296,7 +299,10 @@ export default (router: Router, config: Config) => {
     });
   }
 
-  // Logout Route - Simple or with blacklisting based on configuration
+  /**
+   * Logout Route
+   * Blacklist token if enabled, otherwise simple client-side logout
+   */
   router.post(`${prefix}/logout`, async (req, res) => {
     const authHeader = req.headers["authorization"];
     logger.info("Logout attempt received");
@@ -344,7 +350,6 @@ export default (router: Router, config: Config) => {
         );
       } else {
         // Simple logout without blacklisting - just log and return success
-        // Token validation is optional here since it's just for logging
         try {
           jwt.verify(
             token,
@@ -361,7 +366,7 @@ export default (router: Router, config: Config) => {
               }
             }
           );
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (error) {
           logger.info("Logout completed - client-side cleanup");
         }
@@ -370,12 +375,14 @@ export default (router: Router, config: Config) => {
       }
     } catch (error) {
       logger.error("JWT Logout Error", { error });
-      // Even on error, logout should be successful from client perspective
       res.json(apiResponse(200, "Logout successful", true));
     }
   });
 
-  // Logout All Sessions Route (only available with blacklisting enabled)
+  /**
+   * Logout All Sessions Route
+   * Only works if blacklisting is enabled
+   */
   if (config.jwt.refresh && isBlacklistEnabled) {
     router.post(`${prefix}/logout-all`, async (req, res) => {
       const authHeader = req.headers["authorization"];
@@ -441,7 +448,9 @@ export default (router: Router, config: Config) => {
     });
   }
 
-  // Initialize custom blacklist storage if provided
+  /**
+   * Initialize custom blacklist storage if provided
+   */
   if (isBlacklistEnabled && config.jwt.tokenBlacklist?.storageService) {
     setBlacklistStorage(config.jwt.tokenBlacklist.storageService);
     logger.info("Custom blacklist storage initialized");

@@ -1,3 +1,11 @@
+/**
+ * Represents the supported OAuth2 providers for authentication integrations.
+ *
+ * Includes a comprehensive list of popular social, developer, business, media,
+ * communication, gaming, financial, and custom providers.
+ *
+ * This type allows both predefined and custom provider strings to support flexible OAuth2 integrations.
+ */
 export type OAuth2Providers =
   // Major Social Platforms
   | "google"

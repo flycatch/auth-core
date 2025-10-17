@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Request, Response, Router } from "express";
 import { Config } from "../interfaces/config.interface";
 import createLogger from "../lib/wintson.logger";
@@ -10,8 +11,10 @@ import twoFactorAuth, {
 } from "../utils/two-factor-auth";
 import { createSessionPayload } from "../utils/session";
 
-// Extend session interface
-
+/**
+ * Session Authentication Routes
+ * Handles login, 2FA verification, and logout for session-based auth
+ */
 export default (router: Router, config: Config) => {
   if (!config.session) {
     throw new Error("Session authentication not configured");
@@ -23,7 +26,10 @@ export default (router: Router, config: Config) => {
 
   const { initiate2fa, verifyOtp } = twoFactorAuth(config.twoFA);
 
-  // Login Route - Each login creates a new session (supports multiple sessions)
+  /**
+   * Login Route (without 2FA)
+   * Each login creates a new session (supports multiple sessions)
+   */
   if (!config.twoFA?.enabled) {
     router.post(`${prefix}/login`, async (req: Request, res: Response) => {
       const { username, password } = req.body;
@@ -53,26 +59,29 @@ export default (router: Router, config: Config) => {
           return res.status(401).json(apiResponse(401, "Login Failed", false));
         }
 
+        // Prepare session payload
         const payload = {
           id: user.id,
           username: user.username,
           type: "access" as const,
-          // Fix the typo: should be 'grants' not 'grands'
           ...(user.grants && user.grants.length > 0 && { grants: user.grants }),
         };
 
-        // Store user details in session - this creates a new session each time
+        // Store user details in session
         req.session.user = payload;
 
         logger.info(`Session login successful for user: ${username}`);
         res.json(apiResponse(200, "Login successful", true, [payload]));
       } catch (error) {
-        logger.error(`Session login error for username: ${username}`, {
-          error,
-        });
+        logger.error(`Session login error for username: ${username}`, { error });
         res.status(500).json(apiResponse(500, "Internal server error", false));
       }
     });
+
+    /**
+     * Login Route with 2FA enabled
+     * Generates OTP and stores session after verification
+     */
   } else {
     router.post(`${prefix}/login`, async (req: Request, res: Response) => {
       try {
@@ -100,12 +109,12 @@ export default (router: Router, config: Config) => {
           });
         }
 
+        // Initiate OTP generation
         await initiate2fa(user);
         logger.info(`OTP Generated and transported succesfully`);
         res.status(200).json({
           message: "Send One Time Password for Two Factor Authentication",
         });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         if (error instanceof TransportNotFoundError) {
           logger.warn(error.message);
@@ -120,6 +129,10 @@ export default (router: Router, config: Config) => {
       }
     });
 
+    /**
+     * OTP Verification Route
+     * Verifies OTP and creates session for user
+     */
     router.post(`${prefix}/verify`, async (req: Request, res: Response) => {
       const { otp, email } = req.body;
       if (!otp || !email) {
@@ -140,16 +153,13 @@ export default (router: Router, config: Config) => {
         }
 
         logger.info("OTP Verified Successfully");
-        // Issue JWT or session
 
+        // Create session payload after successful OTP verification
         const payload = createSessionPayload(user);
-        // Store user details in session
         req.session.user = payload;
 
-        logger.info(`Session Login successful `);
+        logger.info(`Session Login successful`);
         return res.json(apiResponse(201, "Login Successful", true, [payload]));
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         if (error instanceof OtpExpiredError || InvalidOtpError) {
           logger.warn(error.message);
@@ -161,11 +171,14 @@ export default (router: Router, config: Config) => {
     });
   }
 
-  // Logout Route - Simple logout that destroys current session
+  /**
+   * Logout Route
+   * Destroys current session and clears session cookie
+   */
   router.post(`${prefix}/logout`, (req: Request, res: Response) => {
     logger.info("Session logout attempt received");
 
-    // If no session exists, still return success (client-side cleanup)
+    // Handle case when no session exists
     if (!req.session || !req.session.user) {
       logger.info("Logout completed (no active session)");
       return res.json(apiResponse(200, "Logout successful", true));
@@ -173,15 +186,15 @@ export default (router: Router, config: Config) => {
 
     const username = req.session.user.username;
 
-    // Destroy the session
+    // Destroy session
     req.session.destroy((err) => {
       if (err) {
         logger.error("Error destroying session", { error: err });
         return res.status(500).json(apiResponse(500, "Logout failed", false));
       }
 
-      // Clear the session cookie
-      res.clearCookie("connect.sid"); // Default session cookie name
+      // Clear default session cookie
+      res.clearCookie("connect.sid");
 
       logger.info(`Session logout successful for user: ${username}`);
       res.json(apiResponse(200, "Logout successful", true));

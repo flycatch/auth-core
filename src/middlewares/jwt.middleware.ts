@@ -5,8 +5,16 @@ import { Config } from "../interfaces/config.interface";
 import createLogger from "../lib/wintson.logger";
 import { isTokenBlacklisted } from "../routes/jwt.routes";
 
-// Extend Request interface to include user
-
+/**
+ * Express middleware for validating JWT access tokens.
+ *
+ * This middleware verifies the JWT token in the Authorization header,
+ * checks for token blacklisting, validates token type, and attaches
+ * the decoded user payload to the request object.
+ *
+ * @param {Config} config - Application configuration containing JWT settings.
+ * @returns {import("express").RequestHandler} Express middleware function.
+ */
 export default (config: Config) => {
   return (req: Request, res: Response, next: NextFunction) => {
     const logger = createLogger(config);
