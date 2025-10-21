@@ -63,13 +63,17 @@ export default (router: Router, config: Config) => {
   const prefix = config.jwt.prefix || "/auth/jwt";
   const isBlacklistEnabled = config.jwt.tokenBlacklist?.enabled ?? false;
 
-  const { initiate2fa, verifyOtp } = twoFactorAuth(config.twoFA);
+let twoFASetup: ReturnType<typeof twoFactorAuth> | null = null;
+  if(config.twoFA?.enabled){
+    twoFASetup = twoFactorAuth(config.twoFA)
+  }
+
 
   /**
    * Login route
    * Handles normal login or 2FA-enabled login
    */
-  if (!config.twoFA?.enabled) {
+  if (!twoFASetup) {
     router.post(`${prefix}/login`, async (req: Request, res: Response) => {
       if (!config.jwt) {
         throw new Error("JWT not configured");
@@ -143,7 +147,7 @@ export default (router: Router, config: Config) => {
           });
         }
 
-        await initiate2fa(user);
+        await twoFASetup.initiate2fa(user);
         logger.info(`OTP Generated and transported succesfully`);
         res.status(200).json({
           message: "Send One Time Password for Two Factor Authentication",
@@ -180,7 +184,7 @@ export default (router: Router, config: Config) => {
           return res.status(401).json({ error: "Login Failed" });
         }
 
-        const isValid = await verifyOtp(user, otp);
+        const isValid = await twoFASetup.verifyOtp(user, otp);
         if (!isValid) {
           logger.warn("Invalid OTP");
           res.status(401).json({ error: "Login Failed" });

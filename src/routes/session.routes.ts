@@ -24,13 +24,16 @@ export default (router: Router, config: Config) => {
   router.use(express.json());
   const prefix = config.session.prefix || "/auth/session";
 
-  const { initiate2fa, verifyOtp } = twoFactorAuth(config.twoFA);
+  let twoFASetup: ReturnType<typeof twoFactorAuth> | null = null;
+    if(config.twoFA?.enabled){
+      twoFASetup = twoFactorAuth(config.twoFA)
+    }
 
   /**
    * Login Route (without 2FA)
    * Each login creates a new session (supports multiple sessions)
    */
-  if (!config.twoFA?.enabled) {
+  if (!twoFASetup) {
     router.post(`${prefix}/login`, async (req: Request, res: Response) => {
       const { username, password } = req.body;
       logger.info(`Session login attempt for user: ${username}`);
@@ -110,7 +113,7 @@ export default (router: Router, config: Config) => {
         }
 
         // Initiate OTP generation
-        await initiate2fa(user);
+        await twoFASetup.initiate2fa(user);
         logger.info(`OTP Generated and transported succesfully`);
         res.status(200).json({
           message: "Send One Time Password for Two Factor Authentication",
@@ -147,7 +150,7 @@ export default (router: Router, config: Config) => {
           return res.status(401).json({ error: "Invalid User" });
         }
 
-        const isValid = await verifyOtp(user, otp);
+        const isValid = await twoFASetup.verifyOtp(user, otp);
         if (!isValid) {
           res.status(401).json({ error: "Invalid OTP" });
         }

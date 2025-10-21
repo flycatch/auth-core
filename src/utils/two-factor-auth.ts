@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import ms from "ms"; // Optional dep for parsing '5m' to ms; add if not present
-import { Config } from "../interfaces/config.interface";
+import { TwoFAConfig } from "../interfaces/config.interface";
 import { User } from "../interfaces/user.interface";
 
 /**
@@ -21,8 +21,7 @@ function generateOtp(
       chars = "0123456789";
       break;
     case "alphanumeric":
-      chars =
-        "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+      chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
       break;
     default:
       throw new Error("Invalid OTP format");
@@ -42,11 +41,7 @@ function generateOtp(
  * }} Object containing initiate2fa and verifyOtp functions.
  * @throws {Error} Throws if configuration is missing or incomplete.
  */
-export default (config: Config["twoFA"]) => {
-  if (!config) {
-    throw new Error("No configuration added for 2FA");
-  }
-
+export default (config: TwoFAConfig) => {
   /**
    * Initiates a 2FA flow for a user by generating and sending OTP.
    *
@@ -62,7 +57,9 @@ export default (config: Config["twoFA"]) => {
     const rawExpiresIn = config.otpExpiresIn ?? "5m";
 
     const expiresInMs =
-      typeof rawExpiresIn === "number" ? rawExpiresIn : (ms(rawExpiresIn) as number);
+      typeof rawExpiresIn === "number"
+        ? rawExpiresIn
+        : (ms(rawExpiresIn) as number);
 
     if (config.onOtpGenerated) await config.onOtpGenerated(otp, user);
 
