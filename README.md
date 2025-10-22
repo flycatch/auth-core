@@ -271,7 +271,6 @@ cookies: {
 ```javascript
 twoFA: {
   enabled: true,
-  prefix: "/auth/2fa",
   otpLength: 6,
   otpType: "numeric",
   otpExpiresIn: "5m",
@@ -292,7 +291,6 @@ twoFA: {
 ```
 
 - **enabled**: Enables 2FA for JWT or session-based authentication.
-- **prefix**: Route prefix for 2FA endpoints.
 - **otpLength**: Length of the OTP.
 - **otpType**: Type of OTP (numeric or alphanumeric).
 - **otpExpiresIn**: OTP expiration time.
