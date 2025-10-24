@@ -213,12 +213,14 @@ export default (router: Router, config: Config) => {
               /**
                * Set refresh token as HTTP-only cookie if configured
                */
-              if (
-                config.oauth2?.setRefreshCookie &&
-                refreshToken &&
-                config.cookies?.enabled
-              ) {
-                setRefreshTokenCookie(res, refreshToken, config);
+              if (config.oauth2?.setRefreshCookie && refreshToken) {
+                res.cookie("AuthRefreshToken", refreshToken, {
+                  httpOnly: true,
+                  secure: true,
+                  sameSite: "strict",
+                  maxAge: 5 * 60 * 1000,
+                  path: "/",
+                });
                 logger.info("Refresh token set as HTTP-only cookie");
               }
 
@@ -336,30 +338,4 @@ const handleOAuthFailure = (
   }
 
   res.redirect(failureUrl.toString());
-};
-
-/**
- * Set refresh token as HTTP-only cookie
- */
-const setRefreshTokenCookie = (
-  res: Response,
-  refreshToken: string,
-  config: Config
-) => {
-  const cookieConfig = config.cookies || {};
-  const cookieName = (cookieConfig as any).name || "AuthRefreshToken";
-  const httpOnly = (cookieConfig as any).httpOnly ?? true;
-  const secure =
-    (cookieConfig as any).secure ?? process.env.NODE_ENV === "production";
-  const sameSite = (cookieConfig as any).sameSite || "Strict";
-  const maxAge = (cookieConfig as any).maxAge || 7 * 24 * 60 * 60 * 1000;
-  const path = (cookieConfig as any).path || "/";
-
-  res.cookie(cookieName, refreshToken, {
-    httpOnly,
-    secure,
-    sameSite: sameSite as any,
-    maxAge,
-    path,
-  });
 };

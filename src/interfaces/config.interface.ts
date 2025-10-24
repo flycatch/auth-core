@@ -159,19 +159,6 @@ export interface OAuth2Config {
 }
 
 /**
- * Configuration for cookies used in authentication or sessions.
- */
-export interface CookieConfig {
-  enabled: boolean; // Enable or disable cookie-based auth
-  name?: string; // Cookie name
-  httpOnly?: boolean; // Prevent access to cookies via JavaScript
-  secure?: boolean; // Send cookies only over HTTPS
-  sameSite?: "Strict" | "Lax" | "None"; // Cookie SameSite policy
-  maxAge?: number; // Cookie expiry time in milliseconds
-  path?: string; // Cookie path
-}
-
-/**
  * Root application configuration interface combining
  * authentication, session, OAuth2, and related services.
  */
@@ -180,7 +167,6 @@ export interface Config {
   session?: SessionConfig; // Session configuration
   twoFA?: TwoFAConfig; // Two-Factor Authentication configuration
   oauth2?: OAuth2Config; // OAuth 2.0 configuration
-  cookies?: CookieConfig; // Cookie configuration
 
   // Service for loading and creating users
   userService: {
