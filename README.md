@@ -209,12 +209,21 @@ oauth2: {
   prefix: "/auth",
   successRedirect: "http://localhost:3000/oauth-success",
   failureRedirect: "http://localhost:3000/oauth-failure",
-  autoProvision: true,
+  onSuccess(info)=>{
+    const {profile, existingUser,} =info;
+    if(existingUser){
+      return existingUser;
+    }
+
+    // Logic to create new user
+    createUser(profile)
+  },
+  onfailure(info)=>{
+    // Logic to be executed onFailure
+  }
   defaultRole: "ROLE_USER",
   setRefreshCookie: true,
   appendTokensInRedirect: false,
-  includeAuthorities: true,
-  issueJwt: true,
   providers: {
     google: {
       clientID: "GOOGLE_CLIENT_ID",
@@ -236,26 +245,13 @@ oauth2: {
 - **prefix**: Route prefix for OAuth authentication endpoints.
 - **successRedirect**: URL to redirect after successful OAuth authentication.
 - **failureRedirect**: URL to redirect after failed OAuth authentication.
-- **autoProvision**: Automatically create users if they don't exist.
+- **onSuccess**: Callback executed on successful OAuth2 authentication, This is where user registration/creation logic should be implemented
+- **onFailure**: Callback executed on OAuth2 authentication failure
 - **defaultRole**: Default role assigned to new users.
 - **setRefreshCookie**: Set refresh token as HTTP-only cookie.
 - **appendTokensInRedirect**: Include tokens in redirect URL.
-- **includeAuthorities**: Include user grants in JWT tokens.
-- **issueJwt**: Issue JWT tokens for OAuth users.
 - **providers**: Supported providers (e.g., Google, GitHub).
 
-### **Cookie Configuration**
-
-```javascript
-cookies: {
-  enabled: true,
-  name: "AuthRefreshToken",
-  httpOnly: true,
-  secure: false,
-  sameSite: "Strict",
-  maxAge: 7 * 24 * 60 * 60 * 1000,
-  path: "/",
-}
 ```
 
 - **enabled**: Enables cookie support.
@@ -380,7 +376,7 @@ All endpoints use the configured prefix. Default prefixes shown below:
 
 1. User initiates OAuth flow with provider via `/auth/{provider}`.
 2. After successful authentication, provider redirects to `/auth/{provider}/callback`.
-3. Server processes authentication and auto-creates user if enabled.
+3. Server processes authentication and auto-creates user if add any logic onSuccess.
 4. Server redirects to success URL with tokens as cookies.
 5. Subsequent requests use JWT or session authentication.
 
