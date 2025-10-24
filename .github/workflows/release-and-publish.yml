@@ -1,0 +1,78 @@
+name: merge_release_tag
+
+on:
+  push:
+    branches:
+      - "dev"
+      - "main"
+  workflow_dispatch:
+
+jobs:
+  release-tag:
+    runs-on: self-hosted
+    outputs:
+      version: ${{ steps.extract_version.outputs.value }}
+
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+
+      - name: "Set up Node.js"
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: "Extract version from package.json"
+        id: extract_version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "value=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create dev tag
+        if: github.ref == 'refs/heads/dev'
+        run: |
+          git config user.name "${{ github.event.head_commit.committer.name }}"
+          git config user.email "${{ github.event.head_commit.committer.email }}"
+          git tag v${{ steps.extract_version.outputs.value }}-beta
+          git push origin v${{ steps.extract_version.outputs.value }}-beta
+
+      - name: Create main tag
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "${{ github.event.head_commit.committer.name }}"
+          git config user.email "${{ github.event.head_commit.committer.email }}"
+          git tag v${{ steps.extract_version.outputs.value }}
+          git push origin v${{ steps.extract_version.outputs.value }}
+
+  publish:
+    runs-on: self-hosted
+    needs: release-tag
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies and build
+        run: |
+          npm ci
+          npm run build
+
+      - name: Publish to npm
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          make_latest: true
+          tag_name: v${{ needs.release-tag.outputs.version }}
+          target_commitish: 'main'

@@ -1,0 +1,67 @@
+name: npm build Test
+
+on:
+  pull_request:
+    branches:
+      - dev
+      - main
+
+jobs:
+  build_and_deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # required to fetch other branches
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Extract version from base branch
+        id: base_version
+        run: |
+          git fetch origin ${{ github.base_ref }} --depth=1
+          echo "value=$(node -p "JSON.parse(require('child_process').execSync('git show origin/${{ github.base_ref }}:package.json').toString()).version")" >> "$GITHUB_OUTPUT"
+
+      - name: Extract version from current branch
+        id: branch_version
+        run: |
+          echo "value=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: "Version check ${{ steps.base_version.outputs.value || '0.0.0' }} < ${{ steps.branch_version.outputs.value }}"
+        uses: flycatch/check-semver-action@v1.0.1
+        with:
+          prev_version: ${{ steps.base_version.outputs.value || '0.0.0' }}
+          next_version: ${{ steps.branch_version.outputs.value }}
+          singleInc: ${{ github.base_ref == 'dev' }}
+
+      - name: Eslint
+        run: |
+          echo "Eslint in progress"
+          (echo "===== Eslint Attempt: 1 ====" && npm run lint) || {
+            echo "===== Eslint failed...  ====";
+            exit 1;
+          }
+
+      - name: npm build
+        run: |
+          echo "npm build in progress"
+          (echo "===== npm build Attempt: 1 ====" && npm run build) || {
+            echo "===== npm build failed...  ====";
+            exit 1;
+          }
+
+      - name: npm test
+        run: |
+          echo "npm test in progress"
+          (echo "===== npm test Attempt: 1 ====" && npm test) || {
+            echo "===== npm test failed...  ====";
+            exit 1;
+          }
