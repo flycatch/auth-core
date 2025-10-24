@@ -63,11 +63,6 @@ function config(config: Config): Router {
         "OAuth2 failureRedirect is required when OAuth2 is enabled"
       );
     }
-    if (config.oauth2.autoProvision && !config.userService.createUser) {
-      throw new Error(
-        "UserService.createUser is required when OAuth2 autoProvision is enabled"
-      );
-    }
   }
 
   configurations = config;

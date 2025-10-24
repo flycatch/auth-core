@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextFunction, Request, Response, Router } from "express";
-import { Config } from "../interfaces/config.interface";
+import { Config, OAuth2CallbackInfo } from "../interfaces/config.interface";
 import passport from "passport";
 import createLogger from "../lib/wintson.logger";
 import { createJwtTokens } from "../utils/jwt";
@@ -17,7 +17,6 @@ export default (router: Router, config: Config) => {
   const logger = createLogger(config);
   const basePrefix = config.oauth2.prefix || "/auth";
 
-  // Ensure at least one provider is configured
   if (!config.oauth2?.providers) return;
 
   // Iterate over each OAuth provider to setup routes
@@ -60,6 +59,7 @@ export default (router: Router, config: Config) => {
               return handleOAuthFailure(
                 res,
                 config,
+                providerName,
                 error as string,
                 error_description as string
               );
@@ -78,20 +78,85 @@ export default (router: Router, config: Config) => {
           async (req: Request, res: Response) => {
             try {
               logger.info(`Handling ${providerName} OAuth callback`, {
-                hasUser: !!req.user,
+                hasCallbackInfo: !!req.user,
               });
 
               if (!req.user) {
-                logger.error("User data missing in OAuth callback");
+                logger.error("Callback info missing in OAuth callback");
                 return handleOAuthFailure(
                   res,
                   config,
-                  "user_data_missing",
-                  "User data not found"
+                  providerName,
+                  "callback_data_missing",
+                  "OAuth callback data not found"
                 );
               }
 
-              const user = req.user as User;
+              const callbackInfo = req.user as OAuth2CallbackInfo;
+              let user: User;
+
+              // Call the onSuccess callback if provided
+              if (config.oauth2?.onSuccess) {
+                try {
+                  logger.info("Calling onSuccess callback");
+                  user = await config.oauth2.onSuccess(callbackInfo);
+
+                  if (!user) {
+                    logger.error("onSuccess callback did not return a user");
+                    return handleOAuthFailure(
+                      res,
+                      config,
+                      providerName,
+                      "user_creation_failed",
+                      "Failed to create or retrieve user"
+                    );
+                  }
+
+                  // Apply default role if configured and user has no grants
+                  if (
+                    config.oauth2.defaultRole &&
+                    (!user.grants || user.grants.length === 0)
+                  ) {
+                    user.grants = [config.oauth2.defaultRole];
+                    logger.info(
+                      `Assigned default role: ${config.oauth2.defaultRole}`
+                    );
+                  }
+                } catch (err: any) {
+                  logger.error("Error in onSuccess callback", {
+                    error: err.message,
+                    stack: err.stack,
+                  });
+                  return handleOAuthFailure(
+                    res,
+                    config,
+                    providerName,
+                    "callback_error",
+                    err.message
+                  );
+                }
+              } else {
+                // Fallback to existing user or fail
+                if (callbackInfo.existingUser) {
+                  user = callbackInfo.existingUser;
+                  logger.info("Using existing user (no onSuccess callback)");
+                } else {
+                  logger.warn(
+                    "No onSuccess callback and no existing user found"
+                  );
+                  return handleOAuthFailure(
+                    res,
+                    config,
+                    providerName,
+                    "user_not_found",
+                    "User not found and no onSuccess callback configured"
+                  );
+                }
+              }
+
+              // Ensure provider info is set
+              user.provider = callbackInfo.provider;
+              user.providerId = callbackInfo.profile.providerId;
 
               // Initialize auth result variables
               let authResult;
@@ -100,7 +165,6 @@ export default (router: Router, config: Config) => {
 
               /**
                * JWT Authentication
-               * Generates access and refresh tokens if configured
                */
               if (config.oauth2?.issueJwt !== false && config.jwt?.enabled) {
                 const jwtPayload: any = {
@@ -108,7 +172,6 @@ export default (router: Router, config: Config) => {
                   email: user.email,
                 };
 
-                // Include authorities/grants if configured
                 if (
                   config.oauth2 &&
                   config.oauth2.includeAuthorities &&
@@ -131,7 +194,6 @@ export default (router: Router, config: Config) => {
 
                 /**
                  * Session-based Authentication
-                 * Used if JWT is not configured but sessions are enabled
                  */
               } else if (config.session?.enabled) {
                 authResult = createSessionPayload(user);
@@ -142,13 +204,14 @@ export default (router: Router, config: Config) => {
                 return handleOAuthFailure(
                   res,
                   config,
+                  providerName,
                   "auth_not_configured",
                   "Authentication method not configured"
                 );
               }
 
               /**
-               * Optionally set refresh token as HTTP-only cookie
+               * Set refresh token as HTTP-only cookie if configured
                */
               if (
                 config.oauth2?.setRefreshCookie &&
@@ -159,7 +222,7 @@ export default (router: Router, config: Config) => {
                 logger.info("Refresh token set as HTTP-only cookie");
               }
 
-              // Redirect to configured success URL
+              // Redirect to success URL
               return handleOAuthSuccess(
                 res,
                 config,
@@ -173,7 +236,13 @@ export default (router: Router, config: Config) => {
                 error: err.message,
                 stack: err.stack,
               });
-              handleOAuthFailure(res, config, "internal_error", err.message);
+              handleOAuthFailure(
+                res,
+                config,
+                providerName,
+                "internal_error",
+                err.message
+              );
             }
           }
         );
@@ -190,15 +259,25 @@ export default (router: Router, config: Config) => {
 
   /**
    * Internal error route
-   * Redirects to configured failure URL with error details
    */
   router.get(`${basePrefix}/error`, (req: Request, res: Response) => {
-    const { error, error_description } = req.query;
+    const { error, error_description, provider } = req.query;
     const errorMessage = error_description || error || "Authentication failed";
+
+    if (config.oauth2?.onFailure) {
+      config.oauth2.onFailure(
+        (error as string) || "unknown_error",
+        errorMessage as string,
+        (provider as string) || "unknown"
+      );
+    }
 
     const failureUrl = new URL(config.oauth2!.failureRedirect);
     failureUrl.searchParams.set("error", (error as string) || "unknown_error");
     failureUrl.searchParams.set("error_description", errorMessage as string);
+    if (provider) {
+      failureUrl.searchParams.set("provider", provider as string);
+    }
 
     res.redirect(failureUrl.toString());
   });
@@ -206,7 +285,6 @@ export default (router: Router, config: Config) => {
 
 /**
  * Handle OAuth success
- * Redirects user to success URL with optional tokens or user info
  */
 const handleOAuthSuccess = (
   res: Response,
@@ -218,10 +296,8 @@ const handleOAuthSuccess = (
 ) => {
   const successUrl = new URL(config.oauth2!.successRedirect);
 
-  // Always include provider name
   successUrl.searchParams.set("provider", providerName);
 
-  // Append tokens in redirect if configured
   if (config.oauth2!.appendTokensInRedirect) {
     if (accessToken) {
       successUrl.searchParams.set("accessToken", accessToken);
@@ -231,7 +307,6 @@ const handleOAuthSuccess = (
     }
   }
 
-  // Include user info for session-based auth
   if (user && !config.oauth2!.appendTokensInRedirect) {
     successUrl.searchParams.set("user", JSON.stringify(user));
   }
@@ -241,16 +316,21 @@ const handleOAuthSuccess = (
 
 /**
  * Handle OAuth failure
- * Redirects user to failure URL with error details
  */
 const handleOAuthFailure = (
   res: Response,
   config: Config,
+  provider: string,
   error: string,
   errorDescription?: string
 ) => {
+  if (config.oauth2?.onFailure) {
+    config.oauth2.onFailure(error, errorDescription || "", provider);
+  }
+
   const failureUrl = new URL(config.oauth2!.failureRedirect);
   failureUrl.searchParams.set("error", error);
+  failureUrl.searchParams.set("provider", provider);
   if (errorDescription) {
     failureUrl.searchParams.set("error_description", errorDescription);
   }
@@ -272,7 +352,7 @@ const setRefreshTokenCookie = (
   const secure =
     (cookieConfig as any).secure ?? process.env.NODE_ENV === "production";
   const sameSite = (cookieConfig as any).sameSite || "Strict";
-  const maxAge = (cookieConfig as any).maxAge || 7 * 24 * 60 * 60 * 1000; // 7 days
+  const maxAge = (cookieConfig as any).maxAge || 7 * 24 * 60 * 60 * 1000;
   const path = (cookieConfig as any).path || "/";
 
   res.cookie(cookieName, refreshToken, {

@@ -75,7 +75,7 @@ export interface TwoFAConfig {
 /**
  * Configuration for an individual OAuth 2.0 provider.
  */
-export interface CustomProviderConfig {
+export interface ProviderConfig {
   clientID: string; // OAuth2 client ID
   clientSecret: string; // OAuth2 client secret
   callbackURL?: string; // Callback URL for OAuth2 redirect
@@ -94,13 +94,25 @@ export interface CustomProviderConfig {
     name?: string; // Path to name in profile
   };
 
-  // Custom verify callback for OAuth 2.0
+  // to customize callBack
   customVerifyCallback?: (
     accessToken: string,
     refreshToken: string,
     profile: any,
     done: (error: any, user?: any, info?: any) => void
   ) => void;
+}
+
+
+/**
+ * Information provided to OAuth2 callbacks
+ */
+export interface OAuth2CallbackInfo {
+  provider: string;
+  profile: OAuthUserProfile;
+  accessToken: string;
+  refreshToken: string;
+  existingUser?: User | null;
 }
 
 /**
@@ -114,16 +126,35 @@ export interface OAuth2Config {
   prefix?: string; // API prefix for OAuth2 routes
   successRedirect: string; // Redirect URL on successful login
   failureRedirect: string; // Redirect URL on failed login
-  autoProvision?: boolean; // Create users if they don't exist
   defaultRole?: string; // Default role assigned to new users
   setRefreshCookie?: boolean; // Store refresh token as an HTTP cookie
   appendTokensInRedirect?: boolean; // Append tokens in redirect URL
   includeAuthorities?: boolean; // Include roles/grants in tokens
   issueJwt?: boolean; // Whether to issue JWT tokens
 
+   /**
+   * Callback executed on successful OAuth2 authentication
+   * This is where user registration/creation logic should be implemented
+   * @param info - Contains provider details, user profile, and tokens
+   * @returns User object (existing or newly created)
+   */
+  onSuccess?: (info: OAuth2CallbackInfo) => Promise<User> | User;
+
+  /**
+   * Callback executed on OAuth2 authentication failure
+   * @param error - Error code
+   * @param errorDescription - Detailed error description
+   * @param provider - OAuth2 provider name
+   */
+  onFailure?: (
+    error: string,
+    errorDescription: string,
+    provider: string
+  ) => Promise<void> | void;
+
   // List of configured OAuth2 providers
   providers: {
-    [key in OAuth2Providers]?: CustomProviderConfig;
+    [key in OAuth2Providers]?: ProviderConfig;
   };
 }
 
@@ -154,7 +185,6 @@ export interface Config {
   // Service for loading and creating users
   userService: {
     loadUser: (email: string) => Promise<User | null | undefined>; // Fetch user by email
-    createUser?: (profile: OAuthUserProfile) => Promise<User>; // Create new user from OAuth profile
   };
 
   // Method to compare passwords

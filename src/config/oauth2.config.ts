@@ -1,7 +1,11 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import passport from "passport";
-import { Config, CustomProviderConfig } from "../interfaces/config.interface";
+import {
+  Config,
+  OAuth2CallbackInfo,
+  ProviderConfig,
+} from "../interfaces/config.interface";
 import { OAuthUserProfile } from "../interfaces/user.interface";
 
 /**
@@ -22,11 +26,6 @@ export default (config: Config, logger: any) => {
   }
   if (!config.oauth2.failureRedirect) {
     throw new Error("OAuth2 failureRedirect is required");
-  }
-  if (config.oauth2.autoProvision && !config.userService.createUser) {
-    throw new Error(
-      "UserService.createUser is required when autoProvision is enabled"
-    );
   }
 
   Object.entries(config.oauth2.providers).forEach(
@@ -56,14 +55,10 @@ export default (config: Config, logger: any) => {
 
 /**
  * Validates individual OAuth2 provider configuration.
- *
- * @param providerName - Name of the provider (e.g., Google, GitHub)
- * @param config - Custom provider configuration object
- * @throws If required configuration fields are missing
  */
 const validateProviderConfig = (
   providerName: string,
-  config: CustomProviderConfig
+  config: ProviderConfig
 ) => {
   if (!config.clientID) {
     throw new Error(`clientID is required for ${providerName} provider`);
@@ -78,12 +73,6 @@ const validateProviderConfig = (
 
 /**
  * Normalizes and resolves callback URL for an OAuth2 provider.
- *
- * @param callbackURL - Custom callback URL (optional)
- * @param baseURL - Base application URL
- * @param prefix - OAuth2 route prefix (e.g., /auth)
- * @param providerName - Provider name
- * @returns The resolved absolute callback URL
  */
 const normalizeCallbackURL = (
   callbackURL: string | undefined,
@@ -105,15 +94,10 @@ const normalizeCallbackURL = (
 
 /**
  * Configures a single OAuth2 provider and registers it with Passport.
- *
- * @param providerName - Name of the OAuth2 provider
- * @param providerConfig - Provider configuration details
- * @param config - Global application configuration
- * @param logger - Logger instance for reporting status and errors
  */
 const setupOauth2Provider = (
   providerName: string,
-  providerConfig: CustomProviderConfig,
+  providerConfig: ProviderConfig,
   config: Config,
   logger: any
 ) => {
@@ -174,17 +158,11 @@ const setupOauth2Provider = (
 
 /**
  * Creates a verify callback function for Passport OAuth2 strategy.
- * Handles user lookup, optional auto-provisioning, and role assignment.
- *
- * @param providerName - OAuth2 provider name
- * @param providerConfig - Provider configuration
- * @param config - Global configuration object
- * @param logger - Logger instance
- * @returns Passport verify callback function
+ * Loads existing user and prepares callback info for the onSuccess handler.
  */
 const createVerifyCallback = (
   providerName: string,
-  providerConfig: CustomProviderConfig,
+  providerConfig: ProviderConfig,
   config: Config,
   logger: any
 ) => {
@@ -222,53 +200,30 @@ const createVerifyCallback = (
       logger.info(
         `Attempting to load user with email: ${email} from ${providerName}`
       );
-      let user = await config.userService.loadUser(email);
 
-      if (!user && config.oauth2?.autoProvision) {
-        logger.info(`Auto-provisioning new user for email: ${email}`);
+      const existingUser = await config.userService.loadUser(email);
 
-        const userProfile: OAuthUserProfile = {
-          provider: providerName,
-          providerId: providerId?.toString() || "",
-          username,
-          email,
-          login: login || "",
-          attributes: profile._json || profile,
-        };
+      // Prepare the OAuth profile
+      const oauthProfile: OAuthUserProfile = {
+        provider: providerName,
+        providerId: providerId?.toString() || "",
+        username,
+        email,
+        login: login || "",
+        attributes: profile._json || profile,
+      };
 
-        if (config.userService.createUser) {
-          user = await config.userService.createUser(userProfile);
+      // Prepare callback info to pass to routes
+      const callbackInfo: OAuth2CallbackInfo = {
+        provider: providerName,
+        profile: oauthProfile,
+        accessToken,
+        refreshToken,
+        existingUser,
+      };
 
-          if (
-            config.oauth2.defaultRole &&
-            (!user.grants || user.grants.length === 0)
-          ) {
-            user.grants = [config.oauth2.defaultRole];
-            logger.info(
-              `Assigned default role to new user: ${config.oauth2.defaultRole}`
-            );
-          }
-        } else {
-          logger.warn(
-            "Auto-provisioning enabled but createUser method not provided"
-          );
-        }
-      }
-
-      if (!user) {
-        logger.warn(
-          `User not found for email: ${email} from ${providerName} and auto-provisioning disabled`
-        );
-        return done(null, false, { message: "User not authorized" });
-      }
-
-      user.provider = providerName;
-      user.providerId = providerId;
-
-      logger.info(
-        `User successfully authenticated via ${providerName}: ${email}`
-      );
-      return done(null, user);
+      // Pass the callback info through to the route handler
+      return done(null, callbackInfo);
     } catch (err: any) {
       logger.error(`Error in ${providerName} OAuth 2.0 strategy`, {
         error: err.message,
@@ -281,11 +236,6 @@ const createVerifyCallback = (
 
 /**
  * Retrieves a nested value from an object using a dot-path string.
- * Example: getNestedValue(obj, "user.profile.email")
- *
- * @param obj - The source object
- * @param path - Dot notation path to access nested properties
- * @returns The resolved value or undefined if not found
  */
 const getNestedValue = (obj: any, path: string): any => {
   if (!path) return undefined;
