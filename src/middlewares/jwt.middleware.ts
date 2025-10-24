@@ -1,53 +1,116 @@
-import { NextFunction, Request, Response } from "express";
-import { Config } from "../interfaces/config.interface";
-import { JWTPayload } from "../interfaces/jwt.interface";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
+import { Config } from "../interfaces/config.interface";
 import createLogger from "../lib/wintson.logger";
+import { isTokenBlacklisted } from "../routes/jwt.routes";
 
+/**
+ * Express middleware for validating JWT access tokens.
+ *
+ * This middleware verifies the JWT token in the Authorization header,
+ * checks for token blacklisting, validates token type, and attaches
+ * the decoded user payload to the request object.
+ *
+ * @param {Config} config - Application configuration containing JWT settings.
+ * @returns {import("express").RequestHandler} Express middleware function.
+ */
 export default (config: Config) => {
-  return function (req: Request, res: Response, next: NextFunction) {
+  return (req: Request, res: Response, next: NextFunction) => {
     const logger = createLogger(config);
-    logger.info(" Initializing JWT Middleware...");
 
-    logger.info(" JWT Middleware Started...");
-
-    // Check if JWT is enabled
-    if (!config || !config.jwt || !config.jwt.enabled) {
-      logger.info(" JWT is NOT enabled, skipping middleware...");
-      return next();
+    if (!config.jwt) {
+      logger.error("JWT configuration not found");
+      return res.status(500).json({
+        error: "Something went wrong",
+      });
     }
 
     const authHeader = req.headers["authorization"];
+
     if (!authHeader) {
-      logger.warn(" Unauthorized access attempt (JWT missing)");
-      return res.status(401).json({ error: "Unauthorized" });
+      logger.warn("JWT middleware: No authorization header provided");
+      return res.status(401).json({
+        error: "Unauthorized",
+      });
+    }
+
+    if (!authHeader.startsWith("Bearer ")) {
+      logger.warn("JWT middleware: Invalid authorization header format");
+      return res.status(401).json({
+        error: "Unauthorized",
+      });
     }
 
     const token = authHeader.split(" ")[1];
 
-    jwt.verify(
-      token,
-      config.jwt.secret || "jwt_secret@auth",
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (err: any, decoded: any) => {
+    if (!token) {
+      logger.warn("JWT middleware: No token provided");
+      return res.status(401).json({
+        error: "Unauthorized",
+      });
+    }
+
+    // Check if token is blacklisted (only if blacklisting is enabled)
+    if (config.jwt.tokenBlacklist?.enabled && isTokenBlacklisted(token)) {
+      logger.warn("JWT middleware: Blacklisted token used");
+      return res.status(401).json({
+        error: "Unauthorized",
+      });
+    }
+
+    try {
+      const secret = config.jwt.secret || "jwt_secret@auth";
+
+      jwt.verify(token, secret, (err: any, decoded: any) => {
         if (err) {
-          logger.warn(" Invalid or expired token", { error: err.message });
-          return res.status(403).json({ error: "Token is invalid or expired" });
+          logger.warn("JWT middleware: Token verification failed", {
+            error: err.message,
+          });
+
+          if (err.name === "TokenExpiredError") {
+            return res.status(401).json({
+              error: "Unauthorized",
+            });
+          }
+
+          if (err.name === "JsonWebTokenError") {
+            return res.status(401).json({
+              error: "Unauthorized",
+            });
+          }
+
+          return res.status(401).json({
+            error: "Unauthorized",
+          });
         }
 
-        const user = decoded as JWTPayload;
-        // Check if the token type is 'access'
-        if (user.type !== "access") {
-          logger.warn(
-            " Invalid token type: Only 'access' tokens are allowed for authentication!"
-          );
-          return res.status(403).json({ error: "Invalid token type" });
+        // Ensure it's an access token
+        if (decoded.type !== "access") {
+          logger.warn("JWT middleware: Invalid token type provided");
+          return res.status(401).json({
+            error: "Unauthorized",
+          });
         }
 
-        logger.info(" JWT Verified Successfully!");
-        req.user = user;
+        // Add user to request object
+        req.user = {
+          id: decoded.id,
+          username: decoded.username,
+          grants: decoded.grants || [],
+          tokenType: decoded.type,
+        };
+
+        logger.info(
+          `JWT middleware: Access granted to user: ${decoded.username}`
+        );
         next();
-      }
-    );
+      });
+    } catch (error) {
+      logger.error("JWT middleware: Unexpected error", { error });
+      return res.status(500).json({
+        error: "Internal server error",
+      });
+    }
   };
 };
