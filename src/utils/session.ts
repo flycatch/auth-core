@@ -13,6 +13,6 @@ export const createSessionPayload = (user: User): SessionPayload => {
     id: user.id,
     username: user.username,
     type: "access",
-    ...(user.grands && user.grands.length > 0 ? { grands: user.grands } : {}),
+    ...(user.grants && user.grants.length > 0 ? { grands: user.grants } : {}),
   };
 };
