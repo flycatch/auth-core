@@ -98,15 +98,15 @@ export default (config: TwoFAConfig) => {
 
     const storedOtp = await config.getStoredOtp(user.id);
     if (!storedOtp) {
-      const error = new OtpExpiredError("OTP expired or invalid");
+      const error = new InvalidOtpError("Invalid Otp");
       if (config.onVerifyFail) await config.onVerifyFail(user, error);
-      throw error;
+      return false;
     }
 
     if (storedOtp !== inputOtp) {
-      const error = new InvalidOtpError("Invalid OTP");
+      const error = new InvalidOtpError("Invalid Otp");
       if (config.onVerifyFail) await config.onVerifyFail(user, error);
-      throw error;
+      return false;
     }
 
     if (config.clearOtp) await config.clearOtp(user.id);

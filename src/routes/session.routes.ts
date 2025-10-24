@@ -5,8 +5,6 @@ import createLogger from "../lib/wintson.logger";
 import express from "express";
 import apiResponse from "../utils/api-response";
 import twoFactorAuth, {
-  InvalidOtpError,
-  OtpExpiredError,
   TransportNotFoundError,
 } from "../utils/two-factor-auth";
 import { createSessionPayload } from "../utils/session";
@@ -25,9 +23,9 @@ export default (router: Router, config: Config) => {
   const prefix = config.session.prefix || "/auth/session";
 
   let twoFASetup: ReturnType<typeof twoFactorAuth> | null = null;
-    if(config.twoFA?.enabled){
-      twoFASetup = twoFactorAuth(config.twoFA)
-    }
+  if (config.twoFA?.enabled) {
+    twoFASetup = twoFactorAuth(config.twoFA);
+  }
 
   /**
    * Login Route (without 2FA)
@@ -40,7 +38,7 @@ export default (router: Router, config: Config) => {
 
       // Validate input
       if (!username || !password) {
-        logger.warn("Login failed: Missing username or password");
+        logger.warn("Unauthorized: Missing username or password");
         return res
           .status(400)
           .json(apiResponse(400, "Username and password are required", false));
@@ -49,8 +47,8 @@ export default (router: Router, config: Config) => {
       try {
         const user = await config.userService.loadUser(username);
         if (!user) {
-          logger.warn(`Login failed: User not found (username: ${username})`);
-          return res.status(401).json(apiResponse(401, "Login Failed", false));
+          logger.warn(`Unauthorized: User not found (username: ${username})`);
+          return res.status(401).json(apiResponse(401, "Unauthorized", false));
         }
 
         const validPassword = await config.passwordChecker(
@@ -58,8 +56,8 @@ export default (router: Router, config: Config) => {
           user.password
         );
         if (!validPassword) {
-          logger.warn(`Login failed: Invalid password for user: ${username}`);
-          return res.status(401).json(apiResponse(401, "Login Failed", false));
+          logger.warn(`Unauthorized: Invalid password for user: ${username}`);
+          return res.status(401).json(apiResponse(401, "Unauthorized", false));
         }
 
         // Prepare session payload
@@ -76,7 +74,9 @@ export default (router: Router, config: Config) => {
         logger.info(`Session login successful for user: ${username}`);
         res.json(apiResponse(200, "Login successful", true, [payload]));
       } catch (error) {
-        logger.error(`Session login error for username: ${username}`, { error });
+        logger.error(`Session login error for username: ${username}`, {
+          error,
+        });
         res.status(500).json(apiResponse(500, "Internal server error", false));
       }
     });
@@ -102,13 +102,13 @@ export default (router: Router, config: Config) => {
         const user = await config.userService.loadUser(username);
         if (!user) {
           logger.warn(`Invalid payload`);
-          return res.status(404).json({ message: "Login Failed" });
+          return res.status(401).json({ message: "Unauthorized" });
         }
 
         if (!user.is2faEnabled) {
           logger.warn("Two Factor Authentication is not enabled for the user");
-          return res.status(403).json({
-            error: "Two Factor Authentication is not enabled for the user",
+          return res.status(401).json({
+            error: "Unauthorized",
           });
         }
 
@@ -121,13 +121,14 @@ export default (router: Router, config: Config) => {
       } catch (error: any) {
         if (error instanceof TransportNotFoundError) {
           logger.warn(error.message);
+          logger.error("OTP generated, but No Transport Available")
           return res
-            .status(500)
-            .json({ error: "OTP generated, but No Transport Available" });
+            .status(401)
+            .json({ error: "Unauthorized" });
         }
         logger.error(`Two Factor Auth initalization Failed: ${error.message}`);
         res.status(500).json({
-          error: "Two Factor Auth initalization Failed",
+          error: "Something went wrong",
         });
       }
     });
@@ -147,12 +148,12 @@ export default (router: Router, config: Config) => {
       try {
         const user = await config.userService.loadUser(email);
         if (!user) {
-          return res.status(401).json({ error: "Invalid User" });
+          return res.status(401).json({ error: "Unauthorized" });
         }
 
         const isValid = await twoFASetup.verifyOtp(user, otp);
         if (!isValid) {
-          res.status(401).json({ error: "Invalid OTP" });
+          return res.status(401).json({ error: "Unauthorized" });
         }
 
         logger.info("OTP Verified Successfully");
@@ -164,12 +165,8 @@ export default (router: Router, config: Config) => {
         logger.info(`Session Login successful`);
         return res.json(apiResponse(201, "Login Successful", true, [payload]));
       } catch (error: any) {
-        if (error instanceof OtpExpiredError || InvalidOtpError) {
-          logger.warn(error.message);
-          return res.status(401).json({ error: error.message });
-        }
         logger.error(error.message);
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: "Something went wrong" });
       }
     });
   }
@@ -193,7 +190,7 @@ export default (router: Router, config: Config) => {
     req.session.destroy((err) => {
       if (err) {
         logger.error("Error destroying session", { error: err });
-        return res.status(500).json(apiResponse(500, "Logout failed", false));
+        return res.status(500).json(apiResponse(500, "Something went wrong", false));
       }
 
       // Clear default session cookie

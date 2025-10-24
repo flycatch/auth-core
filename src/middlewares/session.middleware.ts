@@ -26,7 +26,7 @@ export default (config: Config) => {
         logger.warn(
           "Session middleware: Invalid session type - only 'access' sessions are allowed"
         );
-        return res.status(403).json({ error: "Invalid session type" });
+        return res.status(401).json({ error: "Unauthorized" });
       }
 
       logger.info(

@@ -232,7 +232,7 @@ describe("AuthCore", () => {
         .send({ username: "test@example.com", password: "wrong" });
 
       expect(response.status).toBe(401);
-      expect(response.body.message).toBe("Login Failed");
+      expect(response.body.message).toBe("Unauthorized");
     });
 
     test("should verify valid JWT token", async () => {
@@ -258,7 +258,7 @@ describe("AuthCore", () => {
         .set("Authorization", "Bearer invalid-token");
 
       expect(response.status).toBe(401);
-      expect(response.body.error).toBe("Invalid token");
+      expect(response.body.error).toBe("Unauthorized");
     });
 
     test("should refresh JWT token", async () => {
@@ -385,7 +385,7 @@ describe("AuthCore", () => {
         .send({ username: "nonexistent@example.com" });
 
       expect(response.status).toBe(401);
-      expect(response.body.message).toBe("Login Failed");
+      expect(response.body.message).toBe("Unauthorized");
       expect(mockTransport).not.toHaveBeenCalled();
       expect(mockStoreOtp).not.toHaveBeenCalled();
     });
@@ -415,7 +415,7 @@ describe("AuthCore", () => {
         .send({ email: "test@example.com", otp: "invalid" });
 
       expect(response.status).toBe(401);
-      expect(response.body.error).toBe("Invalid OTP");
+      expect(response.body.error).toBe("Unauthorized");
     });
   });
 
@@ -470,7 +470,7 @@ describe("AuthCore", () => {
         .send({ username: "test@example.com", password: "wrong" });
 
       expect(response.status).toBe(401);
-      expect(response.body.message).toBe("Login Failed");
+      expect(response.body.message).toBe("Unauthorized");
     });
 
     test("should support multiple sessions", async () => {
@@ -583,8 +583,8 @@ describe("AuthCore", () => {
         .post("/auth/session/login")
         .send({ username: "nonexistent@example.com" });
 
-      expect(response.status).toBe(404);
-      expect(response.body.message).toBe("Login Failed");
+      expect(response.status).toBe(401);
+      expect(response.body.message).toBe("Unauthorized");
       expect(mockTransport).not.toHaveBeenCalled();
       expect(mockStoreOtp).not.toHaveBeenCalled();
     });
@@ -619,7 +619,7 @@ describe("AuthCore", () => {
         .send({ email: "test@example.com", otp: "invalid" });
 
       expect(response.status).toBe(401);
-      expect(response.body.error).toBe("Invalid OTP");
+      expect(response.body.error).toBe("Unauthorized");
     });
   });
 

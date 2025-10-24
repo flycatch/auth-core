@@ -22,7 +22,7 @@ export default (config: Config) => {
     if (!config.jwt) {
       logger.error("JWT configuration not found");
       return res.status(500).json({
-        error: "JWT configuration not found",
+        error: "Something went wrong",
       });
     }
 
@@ -31,14 +31,14 @@ export default (config: Config) => {
     if (!authHeader) {
       logger.warn("JWT middleware: No authorization header provided");
       return res.status(401).json({
-        error: "Access token is required",
+        error: "Unauthorized",
       });
     }
 
     if (!authHeader.startsWith("Bearer ")) {
       logger.warn("JWT middleware: Invalid authorization header format");
       return res.status(401).json({
-        error: "Invalid token format. Use Bearer <token>",
+        error: "Unauthorized",
       });
     }
 
@@ -47,15 +47,15 @@ export default (config: Config) => {
     if (!token) {
       logger.warn("JWT middleware: No token provided");
       return res.status(401).json({
-        error: "Access token is required",
+        error: "Unauthorized",
       });
     }
 
     // Check if token is blacklisted (only if blacklisting is enabled)
     if (config.jwt.tokenBlacklist?.enabled && isTokenBlacklisted(token)) {
       logger.warn("JWT middleware: Blacklisted token used");
-      return res.status(403).json({
-        error: "Token has been revoked",
+      return res.status(401).json({
+        error: "Unauthorized",
       });
     }
 
@@ -70,26 +70,26 @@ export default (config: Config) => {
 
           if (err.name === "TokenExpiredError") {
             return res.status(401).json({
-              error: "Token has expired",
+              error: "Unauthorized",
             });
           }
 
           if (err.name === "JsonWebTokenError") {
             return res.status(401).json({
-              error: "Invalid token",
+              error: "Unauthorized",
             });
           }
 
           return res.status(401).json({
-            error: "Token verification failed",
+            error: "Unauthorized",
           });
         }
 
         // Ensure it's an access token
         if (decoded.type !== "access") {
           logger.warn("JWT middleware: Invalid token type provided");
-          return res.status(403).json({
-            error: "Invalid token type",
+          return res.status(401).json({
+            error: "Unauthorized",
           });
         }
 

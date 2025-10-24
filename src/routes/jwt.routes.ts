@@ -7,8 +7,6 @@ import createLogger from "../lib/wintson.logger";
 import apiResponse from "../utils/api-response";
 import { createJwtTokens } from "../utils/jwt";
 import twoFactorAuth, {
-  InvalidOtpError,
-  OtpExpiredError,
   TransportNotFoundError,
 } from "../utils/two-factor-auth";
 import {
@@ -63,11 +61,10 @@ export default (router: Router, config: Config) => {
   const prefix = config.jwt.prefix || "/auth/jwt";
   const isBlacklistEnabled = config.jwt.tokenBlacklist?.enabled ?? false;
 
-let twoFASetup: ReturnType<typeof twoFactorAuth> | null = null;
-  if(config.twoFA?.enabled){
-    twoFASetup = twoFactorAuth(config.twoFA)
+  let twoFASetup: ReturnType<typeof twoFactorAuth> | null = null;
+  if (config.twoFA?.enabled) {
+    twoFASetup = twoFactorAuth(config.twoFA);
   }
-
 
   /**
    * Login route
@@ -84,7 +81,7 @@ let twoFASetup: ReturnType<typeof twoFactorAuth> | null = null;
 
       // Validate input
       if (!username || !password) {
-        logger.warn("Login failed: Missing username or password");
+        logger.warn("Unauthorized: Missing username or password");
         return res
           .status(400)
           .json(apiResponse(400, "Username and password are required", false));
@@ -93,8 +90,8 @@ let twoFASetup: ReturnType<typeof twoFactorAuth> | null = null;
       try {
         const user = await config.userService.loadUser(username);
         if (!user) {
-          logger.warn(`Login failed: User not found (username: ${username})`);
-          return res.status(401).json(apiResponse(401, "Login Failed", false));
+          logger.warn(`Unauthorized: User not found (username: ${username})`);
+          return res.status(401).json(apiResponse(401, "Unauthorized", false));
         }
 
         const isValidPassword = await config.passwordChecker(
@@ -103,8 +100,8 @@ let twoFASetup: ReturnType<typeof twoFactorAuth> | null = null;
         );
 
         if (!isValidPassword) {
-          logger.warn(`Login failed: Incorrect password for user: ${username}`);
-          return res.status(401).json(apiResponse(401, "Login Failed", false));
+          logger.warn(`Unauthorized: Incorrect password for user: ${username}`);
+          return res.status(401).json(apiResponse(401, "Unauthorized", false));
         }
 
         // Create JWT tokens
@@ -137,13 +134,13 @@ let twoFASetup: ReturnType<typeof twoFactorAuth> | null = null;
         const user = await config.userService.loadUser(username);
         if (!user) {
           logger.warn(`Invalid username`);
-          return res.status(401).json({ message: "Login Failed" });
+          return res.status(401).json({ message: "Unauthorized" });
         }
 
         if (!user.is2faEnabled) {
           logger.warn("Two Factor Authentication is not enabled for the user");
-          return res.status(403).json({
-            error: "Two Factor Authentication is not enabled for the user",
+          return res.status(401).json({
+            error: "Unauthorized",
           });
         }
 
@@ -154,14 +151,12 @@ let twoFASetup: ReturnType<typeof twoFactorAuth> | null = null;
         });
       } catch (error: any) {
         if (error instanceof TransportNotFoundError) {
-          logger.warn(error.message);
-          return res
-            .status(500)
-            .json({ error: "OTP generated, but No Transport Available" });
+          logger.warn("OTP generated, but No Transport Available");
+          return res.status(401).json({ error: "Unauthorized" });
         }
         logger.error(`Two Factor Auth initalization Failed: ${error.message}`);
         res.status(500).json({
-          error: "Two Factor Auth initalization Failed",
+          error: "Something went wrong",
         });
       }
     });
@@ -181,13 +176,13 @@ let twoFASetup: ReturnType<typeof twoFactorAuth> | null = null;
         const user = await config.userService.loadUser(email);
         if (!user) {
           logger.warn("Invalid User");
-          return res.status(401).json({ error: "Login Failed" });
+          return res.status(401).json({ error: "Unauthorized" });
         }
 
         const isValid = await twoFASetup.verifyOtp(user, otp);
         if (!isValid) {
           logger.warn("Invalid OTP");
-          res.status(401).json({ error: "Login Failed" });
+          return res.status(401).json({ error: "Unauthorized" });
         }
 
         logger.info("OTP Verified Successfully");
@@ -202,10 +197,6 @@ let twoFASetup: ReturnType<typeof twoFactorAuth> | null = null;
           apiResponse(201, "Two Factor Oath Successful", true, [tokens])
         );
       } catch (error: any) {
-        if (error instanceof OtpExpiredError || InvalidOtpError) {
-          logger.warn(error.message);
-          return res.status(401).json({ error: error.message });
-        }
         logger.error(error.message);
         res.status(500).json({ error: error.message });
       }
@@ -243,9 +234,7 @@ let twoFASetup: ReturnType<typeof twoFactorAuth> | null = null;
         // Check if token is blacklisted (only if blacklisting is enabled)
         if (isBlacklistEnabled && (await isInBlacklist(refreshToken))) {
           logger.warn("Blacklisted refresh token provided");
-          return res
-            .status(403)
-            .json(apiResponse(403, "Token has been revoked", false));
+          return res.status(401).json(apiResponse(401, "Unauthorized", false));
         }
 
         jwt.verify(
@@ -257,15 +246,15 @@ let twoFASetup: ReturnType<typeof twoFactorAuth> | null = null;
                 error: err.message,
               });
               return res
-                .status(403)
-                .json(apiResponse(403, "Invalid refresh token", false));
+                .status(401)
+                .json(apiResponse(401, "Unauthorized", false));
             }
 
             if (decoded.type !== "refresh") {
               logger.warn("Invalid token type for refresh");
               return res
-                .status(403)
-                .json(apiResponse(403, "Invalid token type", false));
+                .status(401)
+                .json(apiResponse(401, "Unauthorized", false));
             }
 
             if (!config.jwt) {
@@ -370,7 +359,7 @@ let twoFASetup: ReturnType<typeof twoFactorAuth> | null = null;
               }
             }
           );
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (error) {
           logger.info("Logout completed - client-side cleanup");
         }
