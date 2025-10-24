@@ -166,26 +166,7 @@ export default (router: Router, config: Config) => {
               /**
                * JWT Authentication
                */
-              if (config.oauth2?.issueJwt !== false && config.jwt?.enabled) {
-                const jwtPayload: any = {
-                  provider: user.provider,
-                  email: user.email,
-                };
-
-                if (
-                  config.oauth2 &&
-                  config.oauth2.includeAuthorities &&
-                  user.grants
-                ) {
-                  jwtPayload.grants = user.grants;
-                  const roles = user.grants.filter((grant: string | number) =>
-                    String(grant).startsWith("ROLE_")
-                  );
-                  if (roles.length > 0) {
-                    jwtPayload.roles = roles;
-                  }
-                }
-
+              if (config.jwt?.enabled) {
                 authResult = createJwtTokens(config.jwt, user);
                 accessToken = authResult.accessToken;
                 refreshToken = authResult.refreshToken;

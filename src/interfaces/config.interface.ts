@@ -119,8 +119,6 @@ export interface OAuth2CallbackInfo {
  * Global configuration for OAuth 2.0 authentication.
  */
 export interface OAuth2Config {
-  refreshTokenParam: string; // Query parameter name for refresh token
-  accessTokenParam: string; // Query parameter name for access token
   enabled: boolean; // Whether OAuth2 is enabled
   baseURL?: string; // Base URL for OAuth2 callback routes
   prefix?: string; // API prefix for OAuth2 routes
@@ -129,8 +127,6 @@ export interface OAuth2Config {
   defaultRole?: string; // Default role assigned to new users
   setRefreshCookie?: boolean; // Store refresh token as an HTTP cookie
   appendTokensInRedirect?: boolean; // Append tokens in redirect URL
-  includeAuthorities?: boolean; // Include roles/grants in tokens
-  issueJwt?: boolean; // Whether to issue JWT tokens
 
    /**
    * Callback executed on successful OAuth2 authentication
