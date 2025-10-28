@@ -53,9 +53,6 @@ function config(config: Config): Router {
   }
 
   if (config.oauth2?.enabled) {
-    if (config.jwt?.enabled && !config.jwt.refresh) {
-      throw new Error("Should enable refresh in OAuth2 to use JWT with OAuth.");
-    }
     if (!config.oauth2.successRedirect) {
       throw new Error(
         "OAuth2 successRedirect is required when OAuth2 is enabled"

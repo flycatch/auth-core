@@ -162,18 +162,32 @@ export default (router: Router, config: Config) => {
                * JWT Authentication
                */
               if (config.jwt?.enabled) {
-                const { refreshToken } = createJwtTokens(config.jwt, user);
+                const { refreshToken, accessToken } = createJwtTokens(
+                  config.jwt,
+                  user
+                );
 
                 logger.info("JWT tokens created for OAuth user");
 
-                res.cookie("AuthRefreshToken", refreshToken, {
-                  httpOnly: true,
-                  secure: true,
-                  sameSite: "strict",
-                  maxAge: 5 * 60 * 1000,
-                  path: "/",
-                });
-                logger.info("Refresh token set as HTTP-only cookie");
+                if (config.jwt?.refresh && refreshToken) {
+                  res.cookie("AuthRefreshToken", refreshToken, {
+                    httpOnly: false,
+                    secure: true,
+                    sameSite: "strict",
+                    maxAge: 5 * 60 * 1000,
+                    path: "/",
+                  });
+                  logger.info("Refresh token set as  cookie");
+                } else {
+                  res.cookie("AuthToken", accessToken, {
+                    httpOnly: false,
+                    secure: true,
+                    sameSite: "strict",
+                    maxAge: 5 * 60 * 1000,
+                    path: "/",
+                  });
+                  logger.info("Access token set as  cookie");
+                }
 
                 /**
                  * Session-based Authentication
