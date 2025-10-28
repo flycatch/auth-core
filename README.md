@@ -248,19 +248,8 @@ oauth2: {
 - **onSuccess**: Callback executed on successful OAuth2 authentication, This is where user registration/creation logic should be implemented
 - **onFailure**: Callback executed on OAuth2 authentication failure
 - **defaultRole**: Default role assigned to new users.
-- **setRefreshCookie**: Set refresh token as HTTP-only cookie.
-- **appendTokensInRedirect**: Include tokens in redirect URL.
 - **providers**: Supported providers (e.g., Google, GitHub).
 
-```
-
-- **enabled**: Enables cookie support.
-- **name**: Cookie name for refresh token.
-- **httpOnly**: Prevents client-side JavaScript access.
-- **secure**: Only send over HTTPS.
-- **sameSite**: CSRF protection setting.
-- **maxAge**: Cookie expiration time.
-- **path**: Cookie path.
 
 ### **Two-Factor Authentication**
 

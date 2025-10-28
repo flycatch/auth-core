@@ -158,27 +158,43 @@ export default (router: Router, config: Config) => {
               user.provider = callbackInfo.provider;
               user.providerId = callbackInfo.profile.providerId;
 
-              // Initialize auth result variables
-              let authResult;
-              let accessToken: string | undefined;
-              let refreshToken: string | undefined;
-
               /**
                * JWT Authentication
                */
               if (config.jwt?.enabled) {
-                authResult = createJwtTokens(config.jwt, user);
-                accessToken = authResult.accessToken;
-                refreshToken = authResult.refreshToken;
+                const { refreshToken, accessToken } = createJwtTokens(
+                  config.jwt,
+                  user
+                );
 
                 logger.info("JWT tokens created for OAuth user");
+
+                if (config.jwt?.refresh && refreshToken) {
+                  res.cookie("AuthRefreshToken", refreshToken, {
+                    httpOnly: false,
+                    secure: true,
+                    sameSite: "strict",
+                    maxAge: 5 * 60 * 1000,
+                    path: "/",
+                  });
+                  logger.info("Refresh token set as  cookie");
+                } else {
+                  res.cookie("AuthToken", accessToken, {
+                    httpOnly: false,
+                    secure: true,
+                    sameSite: "strict",
+                    maxAge: 5 * 60 * 1000,
+                    path: "/",
+                  });
+                  logger.info("Access token set as  cookie");
+                }
 
                 /**
                  * Session-based Authentication
                  */
               } else if (config.session?.enabled) {
-                authResult = createSessionPayload(user);
-                req.session.user = authResult;
+                const sessionPayload = createSessionPayload(user);
+                req.session.user = sessionPayload;
                 logger.info("Session created for OAuth user");
               } else {
                 logger.error("No authentication method configured");
@@ -191,29 +207,8 @@ export default (router: Router, config: Config) => {
                 );
               }
 
-              /**
-               * Set refresh token as HTTP-only cookie if configured
-               */
-              if (config.oauth2?.setRefreshCookie && refreshToken) {
-                res.cookie("AuthRefreshToken", refreshToken, {
-                  httpOnly: true,
-                  secure: true,
-                  sameSite: "strict",
-                  maxAge: 5 * 60 * 1000,
-                  path: "/",
-                });
-                logger.info("Refresh token set as HTTP-only cookie");
-              }
-
               // Redirect to success URL
-              return handleOAuthSuccess(
-                res,
-                config,
-                providerName,
-                accessToken,
-                refreshToken,
-                user
-              );
+              return handleOAuthSuccess(res, config, providerName, user);
             } catch (err: any) {
               logger.error(`Error during ${providerName} OAuth callback`, {
                 error: err.message,
@@ -273,24 +268,13 @@ const handleOAuthSuccess = (
   res: Response,
   config: Config,
   providerName: string,
-  accessToken?: string,
-  refreshToken?: string,
   user?: User
 ) => {
   const successUrl = new URL(config.oauth2!.successRedirect);
 
   successUrl.searchParams.set("provider", providerName);
 
-  if (config.oauth2!.appendTokensInRedirect) {
-    if (accessToken) {
-      successUrl.searchParams.set("accessToken", accessToken);
-    }
-    if (refreshToken) {
-      successUrl.searchParams.set("refreshToken", refreshToken);
-    }
-  }
-
-  if (user && !config.oauth2!.appendTokensInRedirect) {
+  if (user) {
     successUrl.searchParams.set("user", JSON.stringify(user));
   }
 
