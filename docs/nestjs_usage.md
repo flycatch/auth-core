@@ -1,22 +1,23 @@
-# PassportJS Authentication Library
+# NestJS Usage with Auth-Core
 
-A unified authentication solution for **Express.js** and **NestJS** applications. This library supports **JWT**, **Session-based Authentication**, and **Google OAuth**, providing a seamless integration for both frameworks.
+Auth-Core provides seamless authentication integration for **NestJS** applications, supporting **JWT**, **Session-based**, and **OAuth 2.0** authentication — all configurable through a unified API.
 
 ---
 
 ## Features
 
-- **JWT Authentication** with Access and Refresh Tokens.
-- **Session-based Authentication** for persistent user sessions.
-- **Google OAuth2 Login** for social authentication.
-- Middleware-based verification for secure routes.
-- Easy-to-configure for both **Express.js** and **NestJS**.
+- ✅ **JWT Authentication** with Access and Refresh Tokens
+- ✅ **Session-based Authentication** for persistent user sessions
+- ✅ **OAuth 2.0 Login** (Google, GitHub, and custom providers)
+- ✅ **Two-Factor Authentication (2FA)** support
+- ✅ **Role and Permission-Based Access Control**
+- ✅ Plug-and-play integration with NestJS Guards
 
 ---
 
 ## Installation
 
-Install the library via npm:
+Install Auth-Core via npm:
 
 ```bash
 npm install @flycatch/auth-core
@@ -24,19 +25,92 @@ npm install @flycatch/auth-core
 
 ---
 
-## Usage
+## Configuration in NestJS
 
-### Configuration for NestJS
+### 1. Configure Auth-Core in `main.ts`
 
-#### Install Dependencies
+Initialize Auth-Core just like in Express, but within your NestJS bootstrap function.
 
-```bash
-npm install auth-core @nestjs/auth-core
+```typescript
+import { NestFactory } from "@nestjs/core";
+import { AppModule } from "./app.module";
+import { config } from "@flycatch/auth-core";
+import bcrypt from "bcrypt";
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+
+  const userRepository = {
+    async find(email: string) {
+      return {
+        id: "123",
+        email,
+        username: "exampleUser",
+        grants: ["read_user"],
+        is2faEnabled: false,
+      };
+    },
+  };
+
+  app.use(
+    config({
+      jwt: {
+        enabled: true,
+        secret: "my_jwt_secret",
+        expiresIn: "1h",
+        refresh: true,
+        prefix: "/auth/jwt",
+      },
+      session: {
+        enabled: true,
+        prefix: "/auth/session",
+        secret: "my_session_secret",
+        resave: false,
+        saveUninitialized: true,
+        cookie: { secure: false, maxAge: 60000 },
+      },
+      oauth2: {
+        enabled: true,
+        baseURL: "http://localhost:3000",
+        prefix: "/auth",
+        successRedirect: "http://localhost:3000/oauth-success",
+        failureRedirect: "http://localhost:3000/oauth-failure",
+        providers: {
+          google: {
+            clientID: "GOOGLE_CLIENT_ID",
+            clientSecret: "GOOGLE_CLIENT_SECRET",
+            callbackURL: "/auth/google/callback",
+            scope: ["profile", "email"],
+          },
+        },
+      },
+      userService: {
+        loadUser: async (email) => userRepository.find(email),
+        createUser: async (profile) => ({
+          id: "new-user-id",
+          email: profile.email,
+          username: profile.username,
+          grants: ["ROLE_USER"],
+        }),
+      },
+      passwordChecker: async (inputPassword, storedPassword) =>
+        bcrypt.compare(inputPassword, storedPassword),
+      logs: true,
+    })
+  );
+
+  await app.listen(3000);
+  console.log(`🚀 Server running at http://localhost:3000`);
+}
+
+bootstrap();
 ```
 
-#### Create an `AuthGuard`
+---
 
-Create a custom guard in `authguard.guard.ts`:
+### 2. Create a Custom `AuthGuard`
+
+Use Auth-Core’s `verify()` middleware inside a NestJS Guard for route protection.
 
 ```typescript
 import {
@@ -45,7 +119,7 @@ import {
   ExecutionContext,
   UnauthorizedException,
 } from "@nestjs/common";
-import authCore from "@flycatch/auth-core"; // Import the library
+import { verify } from "@flycatch/auth-core";
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -60,11 +134,11 @@ export class AuthGuard implements CanActivate {
             new UnauthorizedException(err.message || "Unauthorized")
           );
         }
-        resolve(true); // Authentication passed
+        resolve(true);
       };
 
       try {
-        const verifyMiddleware = authCore.verify();
+        const verifyMiddleware = verify();
         verifyMiddleware(req, res, next);
       } catch (error: any) {
         reject(new UnauthorizedException("Authentication error"));
@@ -74,9 +148,13 @@ export class AuthGuard implements CanActivate {
 }
 ```
 
-#### Controller Example
+> ✅ You can also pass permissions to `verify()` — e.g. `verify("admin_access")` — for role-based control.
 
-Define a controller to protect routes in `app.controller.ts`:
+---
+
+### 3. Protect Routes in Your Controller
+
+Use the custom guard to protect any route.
 
 ```typescript
 import { Controller, Get, UseGuards, Req } from "@nestjs/common";
@@ -87,98 +165,96 @@ export class UserController {
   @Get("/")
   @UseGuards(AuthGuard)
   getUser(@Req() req) {
-    return { user: req.user };
+    return { message: "Access granted", user: req.user };
   }
 }
 ```
 
-#### Integrating Authentication Configuration in `main.ts`
+---
 
-### Set up authentication in your NestJS entry point:
+### 4. Example with Role-Based Access
+
+If your app uses permissions or roles (e.g., `"admin"`), extend your guard:
 
 ```typescript
-import { NestFactory } from "@nestjs/core";
-import { AppModule } from "./app.module";
-import auth from "auth-core"; // Import the library
+@Injectable()
+export class RoleGuard implements CanActivate {
+  constructor(private requiredRole: string) {}
 
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const req = context.switchToHttp().getRequest();
+    const res = context.switchToHttp().getResponse();
 
-  auth.config({
-    jwt: {
-      enabled: true,
-      refresh: true,
-      config: { secret: "your_jwt_secret" },
-    },
-    session: {
-      enabled: true,
-      secret: "your_session_secret",
-    },
-    google: {
-      enabled: true,
-      clientID: "your_google_client_id",
-      clientSecret: "your_google_client_secret",
-      callbackURL: "http://localhost:3000/auth/google/callback",
-    },
-  });
+    return new Promise((resolve, reject) => {
+      const next = (err?: any) => {
+        if (err) return reject(new UnauthorizedException(err.message));
+        if (!req.user?.grants?.includes(this.requiredRole)) {
+          return reject(new UnauthorizedException("Access denied"));
+        }
+        resolve(true);
+      };
 
-  app.use(auth.initialize()); // Initialize authentication middleware
-  await app.listen(3000);
+      verify()(req, res, next);
+    });
+  }
 }
+```
 
-bootstrap();
+Usage:
+
+```typescript
+@Controller("admin")
+export class AdminController {
+  @Get("/")
+  @UseGuards(new RoleGuard("admin"))
+  getAdminDashboard(@Req() req) {
+    return { message: "Admin Access", user: req.user };
+  }
+}
 ```
 
 ---
 
-## Authentication Methods Supported
+## Supported Authentication Methods
 
-1. **JWT Authentication**
-
-   - Provides token-based authentication with access and refresh tokens.
-   - Tokens are validated using the `auth.verify()` middleware.
-
-2. **Session-based Authentication**
-
-   - Securely stores user data in the session.
-   - Sessions are validated using the `auth.verify()` middleware.
-
-3. **Google OAuth**
-   - Enables login via Google.
-   - The library handles redirection, callback, and verification seamlessly.
+| Method        | Description                                                     |
+| ------------- | --------------------------------------------------------------- |
+| **JWT**       | Token-based authentication with access & refresh tokens         |
+| **Session**   | Persistent user sessions stored securely                        |
+| **OAuth 2.0** | Social login via Google, GitHub, or custom providers            |
+| **2FA**       | Optional OTP-based two-factor verification for sensitive logins |
 
 ---
 
 ## Testing Authentication
 
-### Protected Route
-
-Once configured, access a protected route:
-
-#### NestJS:
+### JWT-Protected Route
 
 ```bash
-curl -X GET http://localhost:3000/user -H "Authorization: Bearer <your_jwt_token>"
+curl -X GET http://localhost:3000/user \
+  -H "Authorization: Bearer <your_jwt_token>"
 ```
 
-### Google OAuth Login
+### OAuth 2.0 Login
 
-1. Navigate to: `http://localhost:3000/auth/google`
-2. Authenticate via Google.
-3. Access your user details from `/user`.
+```bash
+http://localhost:3000/auth/google
+```
+
+After successful login, user data is returned from `/user`.
 
 ---
 
 ## Contributing
 
-Contributions are welcome! Fork the repository and create a PR with your changes.
+Contributions are welcome! Please fork the repository and submit a pull request.
 
 ---
 
 ## License
 
-GPL-3.0 License. See the `LICENSE` file for details.
+This project is licensed under the **GPL-3.0 License**.
 
 ---
 
-## [Back](../README.md)
+## [⬅ Back to Main README](../README.md)

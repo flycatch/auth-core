@@ -125,8 +125,6 @@ export interface OAuth2Config {
   successRedirect: string; // Redirect URL on successful login
   failureRedirect: string; // Redirect URL on failed login
   defaultRole?: string; // Default role assigned to new users
-  setRefreshCookie?: boolean; // Store refresh token as an HTTP cookie
-  appendTokensInRedirect?: boolean; // Append tokens in redirect URL
 
    /**
    * Callback executed on successful OAuth2 authentication
