@@ -67,12 +67,19 @@ app.use(
       prefix: "/auth",
       successRedirect: "http://localhost:3000/oauth-success",
       failureRedirect: "http://localhost:3000/oauth-failure",
-      autoProvision: true,
       defaultRole: "ROLE_USER",
-      setRefreshCookie: true,
-      appendTokensInRedirect: false,
-      includeAuthorities: true,
-      issueJwt: true,
+      onSuccess(info)=>{
+        const {profile, existingUser,} =info;
+        if(existingUser){
+          return existingUser;
+        }
+
+        // Logic to create new user
+        reateUser(profile)
+      },
+      onfailure(info)=>{
+      // Logic to be executed onFailure
+      },
       providers: {
         google: {
           clientID: "GOOGLE_CLIENT_ID",
@@ -81,15 +88,6 @@ app.use(
           scope: ["profile", "email"],
         },
       },
-    },
-    cookies: {
-      enabled: true,
-      name: "AuthRefreshToken",
-      httpOnly: true,
-      secure: false,
-      sameSite: "Strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: "/",
     },
     twoFA: {
       enabled: false,
@@ -250,7 +248,6 @@ oauth2: {
 - **defaultRole**: Default role assigned to new users.
 - **providers**: Supported providers (e.g., Google, GitHub).
 
-
 ### **Two-Factor Authentication**
 
 ```javascript
@@ -334,6 +331,7 @@ All endpoints use the configured prefix. Default prefixes shown below:
 - **GET** `/auth/{provider}` - Initiate OAuth login
 - **GET** `/auth/{provider}/callback` - OAuth callback
 - **GET** `/auth/error` - OAuth error redirect
+- **POST** `/auth/token` - to get token from temporary code
 
 ### **Two-Factor Authentication**
 
@@ -368,6 +366,15 @@ All endpoints use the configured prefix. Default prefixes shown below:
 3. Server processes authentication and auto-creates user if add any logic onSuccess.
 4. Server redirects to success URL with tokens as cookies.
 5. Subsequent requests use JWT or session authentication.
+6. After successful provider authentication, the temporary code will be set as a query parameter on the redirect URL.
+7. Frontend can then trigger `{prefix}/token` with a `POST` request and payload:
+
+```json
+{
+  "code": "code-from-redirect-url"
+}
+```
+
 
 ## Logout Behavior
 
