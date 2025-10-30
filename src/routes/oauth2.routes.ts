@@ -6,6 +6,21 @@ import createLogger from "../lib/wintson.logger";
 import { createJwtTokens } from "../utils/jwt";
 import { User } from "../interfaces/user.interface";
 import { createSessionPayload } from "../utils/session";
+import crypto from "crypto";
+
+// In-memory store for temporary authorization codes
+// In production, use Redis or a database with TTL
+const authCodeStore = new Map<string, { user: User; expiresAt: number }>();
+
+// Cleanup expired codes every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [code, data] of authCodeStore.entries()) {
+    if (data.expiresAt < now) {
+      authCodeStore.delete(code);
+    }
+  }
+}, 5 * 60 * 1000);
 
 /**
  * OAuth2 Routes
@@ -74,7 +89,7 @@ export default (router: Router, config: Config) => {
               failureRedirect: `${basePrefix}/error`,
             } as any)(req, res, next);
           },
-          // Success handler
+          // Success handler - Generate temporary code
           async (req: Request, res: Response) => {
             try {
               logger.info(`Handling ${providerName} OAuth callback`, {
@@ -158,57 +173,16 @@ export default (router: Router, config: Config) => {
               user.provider = callbackInfo.provider;
               user.providerId = callbackInfo.profile.providerId;
 
-              /**
-               * JWT Authentication
-               */
-              if (config.jwt?.enabled) {
-                const { refreshToken, accessToken } = createJwtTokens(
-                  config.jwt,
-                  user
-                );
+              // Generate temporary authorization code
+              const authCode = crypto.randomBytes(32).toString("hex");
+              const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes
 
-                logger.info("JWT tokens created for OAuth user");
+              // Store user data with the code
+              authCodeStore.set(authCode, { user, expiresAt });
+              logger.info("Temporary auth code generated", { authCode });
 
-                if (config.jwt?.refresh && refreshToken) {
-                  res.cookie("AuthRefreshToken", refreshToken, {
-                    httpOnly: false,
-                    secure: true,
-                    sameSite: "strict",
-                    maxAge: 5 * 60 * 1000,
-                    path: "/",
-                  });
-                  logger.info("Refresh token set as  cookie");
-                } else {
-                  res.cookie("AuthToken", accessToken, {
-                    httpOnly: false,
-                    secure: true,
-                    sameSite: "strict",
-                    maxAge: 5 * 60 * 1000,
-                    path: "/",
-                  });
-                  logger.info("Access token set as  cookie");
-                }
-
-                /**
-                 * Session-based Authentication
-                 */
-              } else if (config.session?.enabled) {
-                const sessionPayload = createSessionPayload(user);
-                req.session.user = sessionPayload;
-                logger.info("Session created for OAuth user");
-              } else {
-                logger.error("No authentication method configured");
-                return handleOAuthFailure(
-                  res,
-                  config,
-                  providerName,
-                  "auth_not_configured",
-                  "Authentication method not configured"
-                );
-              }
-
-              // Redirect to success URL
-              return handleOAuthSuccess(res, config, providerName, user);
+              // Redirect to frontend with the code
+              return handleOAuthSuccess(res, config, providerName, authCode);
             } catch (err: any) {
               logger.error(`Error during ${providerName} OAuth callback`, {
                 error: err.message,
@@ -234,6 +208,105 @@ export default (router: Router, config: Config) => {
       }
     }
   );
+
+  /**
+   * Token exchange endpoint
+   * Frontend calls this with the authorization code to get actual tokens
+   */
+  router.post(`${basePrefix}/token`, async (req: Request, res: Response) => {
+    try {
+      const { code } = req.body;
+
+      if (!code) {
+        logger.warn("Token exchange attempted without code");
+        return res.status(400).json({ error: "Authorization code required" });
+      }
+
+      // Retrieve user data from code
+      const codeData = authCodeStore.get(code);
+
+      if (!codeData) {
+        logger.warn("Invalid or expired authorization code", { code });
+        return res.status(401).json({ error: "Invalid or expired code" });
+      }
+
+      // Check expiration
+      if (codeData.expiresAt < Date.now()) {
+        authCodeStore.delete(code);
+        logger.warn("Expired authorization code used", { code });
+        return res.status(401).json({ error: "Code expired" });
+      }
+
+      const user = codeData.user;
+
+      // Delete code after use (one-time use)
+      authCodeStore.delete(code);
+      logger.info("Authorization code exchanged successfully");
+
+      /**
+       * JWT Authentication
+       */
+      if (config.jwt?.enabled) {
+        const { refreshToken, accessToken } = createJwtTokens(config.jwt, user);
+
+        logger.info("JWT tokens created for OAuth user");
+
+        const response: any = {
+          success: true,
+          user,
+          accessToken,
+        };
+
+        if (config.jwt?.refresh && refreshToken) {
+          response.refreshToken = refreshToken;
+
+          // Set refresh token as httpOnly cookie
+          res.cookie("AuthRefreshToken", refreshToken, {
+            httpOnly: true,
+            secure: true,
+            sameSite: "strict",
+            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+            path: "/",
+          });
+          logger.info("Refresh token set as httpOnly cookie");
+        }
+
+        return res.json(response);
+
+        /**
+         * Session-based Authentication
+         */
+      } else if (config.session?.enabled) {
+        const sessionPayload = createSessionPayload(user);
+        req.session.user = sessionPayload;
+
+        logger.info("Session created for OAuth user");
+
+        // Save session before sending response
+        req.session.save((err) => {
+          if (err) {
+            logger.error("Failed to save session", { error: err.message });
+            return res.status(500).json({ error: "Failed to create session" });
+          }
+
+          return res.json({
+            success: true,
+            user,
+            sessionId: req.sessionID,
+          });
+        });
+      } else {
+        logger.error("No authentication method configured");
+        return res.status(500).json({ error: "Authentication not configured" });
+      }
+    } catch (err: any) {
+      logger.error("Error during token exchange", {
+        error: err.message,
+        stack: err.stack,
+      });
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  });
 
   /**
    * Internal error route
@@ -262,21 +335,18 @@ export default (router: Router, config: Config) => {
 };
 
 /**
- * Handle OAuth success
+ * Handle OAuth success - redirect with authorization code
  */
 const handleOAuthSuccess = (
   res: Response,
   config: Config,
   providerName: string,
-  user?: User
+  authCode: string
 ) => {
   const successUrl = new URL(config.oauth2!.successRedirect);
 
   successUrl.searchParams.set("provider", providerName);
-
-  if (user) {
-    successUrl.searchParams.set("user", JSON.stringify(user));
-  }
+  successUrl.searchParams.set("code", authCode);
 
   res.redirect(successUrl.toString());
 };
