@@ -3,7 +3,7 @@ import { Request, Response, Router } from "express";
 import { Config } from "../interfaces/config.interface";
 import jwt from "jsonwebtoken";
 import express from "express";
-import createLogger from "../lib/wintson.logger";
+import createLogger from "../lib/winston.logger";
 import apiResponse from "../utils/api-response";
 import { createJwtTokens } from "../utils/jwt";
 import twoFactorAuth, {
@@ -15,35 +15,8 @@ import {
   setBlacklistStorage,
 } from "../utils/jwt-blacklist";
 
-/**
- * In-memory token blacklist
- * Used only if no custom storage is configured
- */
-const tokenBlacklist = new Set<string>();
 
-/**
- * Add a token to the in-memory blacklist
- * @param token JWT token string
- */
-export const blacklistToken = (token: string): void => {
-  tokenBlacklist.add(token);
-};
 
-/**
- * Check if a token exists in the in-memory blacklist
- * @param token JWT token string
- * @returns boolean indicating if token is blacklisted
- */
-export const isTokenBlacklisted = (token: string): boolean => {
-  return tokenBlacklist.has(token);
-};
-
-/**
- * Clear all tokens from the in-memory blacklist
- */
-export const clearBlacklist = (): void => {
-  tokenBlacklist.clear();
-};
 
 /**
  * JWT Routes
