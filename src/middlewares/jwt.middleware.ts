@@ -2,8 +2,8 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { Config } from "../interfaces/config.interface";
-import createLogger from "../lib/wintson.logger";
-import { isTokenBlacklisted } from "../routes/jwt.routes";
+import createLogger from "../lib/winston.logger";
+import { isInBlacklist } from "../utils/jwt-blacklist";
 
 /**
  * Express middleware for validating JWT access tokens.
@@ -16,7 +16,7 @@ import { isTokenBlacklisted } from "../routes/jwt.routes";
  * @returns {import("express").RequestHandler} Express middleware function.
  */
 export default (config: Config) => {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
     const logger = createLogger(config);
 
     if (!config.jwt) {
@@ -51,8 +51,10 @@ export default (config: Config) => {
       });
     }
 
+    const isBlackisted = await isInBlacklist(token)
+
     // Check if token is blacklisted (only if blacklisting is enabled)
-    if (config.jwt.tokenBlacklist?.enabled && isTokenBlacklisted(token)) {
+    if (config.jwt.tokenBlacklist?.enabled && isBlackisted) {
       logger.warn("JWT middleware: Blacklisted token used");
       return res.status(401).json({
         error: "Unauthorized",

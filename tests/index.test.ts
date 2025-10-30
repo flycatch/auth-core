@@ -68,7 +68,7 @@ jest.mock("passport", () => ({
 }));
 
 // Mock winston logger
-jest.mock("../src/lib/wintson.logger", () => ({
+jest.mock("../src/lib/winston.logger", () => ({
   __esModule: true,
   default: jest.fn(() => ({
     info: jest.fn(),
@@ -292,6 +292,9 @@ describe("AuthCore", () => {
 
       // Mock the blacklist functions
       const jwtRoutes = require("../src/routes/jwt.routes");
+      // Ensure functions exist before spying to avoid Property does not exist errors
+      if (!jwtRoutes.blacklistToken) jwtRoutes.blacklistToken = jest.fn();
+      if (!jwtRoutes.isTokenBlacklisted) jwtRoutes.isTokenBlacklisted = jest.fn();
       jest.spyOn(jwtRoutes, "blacklistToken").mockImplementation((token) => {
         return blacklistedTokens.add(token as string);
       });
