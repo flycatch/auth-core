@@ -2,7 +2,7 @@
 import { NextFunction, Request, Response, Router } from "express";
 import { Config, OAuth2CallbackInfo } from "../interfaces/config.interface";
 import passport from "passport";
-import createLogger from "../lib/wintson.logger";
+import createLogger from "../lib/winston.logger";
 import { createJwtTokens } from "../utils/jwt";
 import { User } from "../interfaces/user.interface";
 import { createSessionPayload } from "../utils/session";

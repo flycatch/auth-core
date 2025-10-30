@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response, Router } from "express";
 import { Config } from "./interfaces/config.interface";
 import express from "express";
-import createLogger from "./lib/wintson.logger";
+import createLogger from "./lib/winston.logger";
 import jwtRoutes from "./routes/jwt.routes";
 import sessionRoutes from "./routes/session.routes";
 import setupSession from "./config/session.config";

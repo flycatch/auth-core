@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Request, Response, Router } from "express";
 import { Config } from "../interfaces/config.interface";
-import createLogger from "../lib/wintson.logger";
+import createLogger from "../lib/winston.logger";
 import express from "express";
 import apiResponse from "../utils/api-response";
 import twoFactorAuth, {

@@ -2,7 +2,7 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { Config } from "../interfaces/config.interface";
-import createLogger from "../lib/wintson.logger";
+import createLogger from "../lib/winston.logger";
 import { isInBlacklist } from "../utils/jwt-blacklist";
 
 /**

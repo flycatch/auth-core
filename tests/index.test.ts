@@ -68,7 +68,7 @@ jest.mock("passport", () => ({
 }));
 
 // Mock winston logger
-jest.mock("../src/lib/wintson.logger", () => ({
+jest.mock("../src/lib/winston.logger", () => ({
   __esModule: true,
   default: jest.fn(() => ({
     info: jest.fn(),

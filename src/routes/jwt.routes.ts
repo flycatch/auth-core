@@ -3,7 +3,7 @@ import { Request, Response, Router } from "express";
 import { Config } from "../interfaces/config.interface";
 import jwt from "jsonwebtoken";
 import express from "express";
-import createLogger from "../lib/wintson.logger";
+import createLogger from "../lib/winston.logger";
 import apiResponse from "../utils/api-response";
 import { createJwtTokens } from "../utils/jwt";
 import twoFactorAuth, {

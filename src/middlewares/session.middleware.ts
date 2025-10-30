@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import { Config } from "../interfaces/config.interface";
-import createLogger from "../lib/wintson.logger";
+import createLogger from "../lib/winston.logger";
 
 /**
  * Express middleware for validating user sessions.
