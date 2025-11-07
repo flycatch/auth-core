@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import AuthCore from "../src/index"; // Default export
+import AuthCore from "../src/index";
 import { Request, Response, NextFunction, RequestHandler } from "express";
 import { Session, SessionData } from "express-session";
 import bcrypt from "bcrypt";
@@ -48,7 +48,6 @@ jest.mock("passport", () => ({
     .mockImplementation(
       (strategy, options) => (req: any, res: any, next: any) => {
         if (req.url.includes("callback") && req.query.error) {
-          // Simulate error response for invalid OAuth code
           res.status(400).json({ error: "Authentication failed" });
         } else if (req.url.includes("callback")) {
           req.user = {
@@ -88,7 +87,6 @@ describe("AuthCore", () => {
   const mockTransport = jest.fn().mockResolvedValue(true);
   const jwtSecret = "test-secret";
 
-  // Mock user matching extended TestUser type
   const createMockUser = (
     email: string,
     is2faEnabled: boolean = false
@@ -100,6 +98,17 @@ describe("AuthCore", () => {
     grants: ["read_user", "admin_access"],
     password: "hashed_password",
     is2faEnabled,
+  });
+
+  // CRITICAL: Setup fake timers to prevent setInterval from keeping process alive
+  beforeAll(() => {
+    jest.useFakeTimers();
+  });
+
+  // CRITICAL: Cleanup all timers after tests complete
+  afterAll(() => {
+    jest.clearAllTimers();
+    jest.useRealTimers();
   });
 
   beforeEach(() => {
@@ -262,7 +271,6 @@ describe("AuthCore", () => {
     });
 
     test("should refresh JWT token", async () => {
-      // Mock jwt.sign to return different tokens for access and refresh
       (jwt.sign as jest.Mock).mockImplementation((payload, secret, options) => {
         if (payload.type === "refresh") {
           return `mock-refresh-token-${payload.id}`;
@@ -287,14 +295,13 @@ describe("AuthCore", () => {
     });
 
     test("should logout and blacklist token", async () => {
-      // Store blacklisted tokens in the test
       const blacklistedTokens = new Set<string>();
-
-      // Mock the blacklist functions
       const jwtRoutes = require("../src/routes/jwt.routes");
-      // Ensure functions exist before spying to avoid Property does not exist errors
+
       if (!jwtRoutes.blacklistToken) jwtRoutes.blacklistToken = jest.fn();
-      if (!jwtRoutes.isTokenBlacklisted) jwtRoutes.isTokenBlacklisted = jest.fn();
+      if (!jwtRoutes.isTokenBlacklisted)
+        jwtRoutes.isTokenBlacklisted = jest.fn();
+
       jest.spyOn(jwtRoutes, "blacklistToken").mockImplementation((token) => {
         return blacklistedTokens.add(token as string);
       });
@@ -315,10 +322,6 @@ describe("AuthCore", () => {
         .set("Authorization", `Bearer ${token}`);
 
       expect(logoutRes.status).toBe(200);
-
-      // After logout, the token should be blacklisted
-      // For this test, we'll just verify the logout was successful
-      // The actual blacklisting would need to be tested with the middleware
     });
   });
 
@@ -643,9 +646,9 @@ describe("AuthCore", () => {
             prefix: "/auth/oauth",
             successRedirect: "http://localhost:3000/oauth-success",
             failureRedirect: "http://localhost:3000/oauth-failure",
-            autoProvision: true, // Allow creating users in tests so callback succeeds
-            setRefreshCookie: false, // Disable cookies for simpler testing
-            appendTokensInRedirect: true, // Include tokens in URL for testing
+            autoProvision: true,
+            setRefreshCookie: false,
+            appendTokensInRedirect: true,
             includeAuthorities: true,
             issueJwt: true,
             providers: {
@@ -659,7 +662,7 @@ describe("AuthCore", () => {
             },
           },
           cookies: {
-            enabled: false, // Disable cookies for tests
+            enabled: false,
           },
           twoFA: {
             enabled: false,
@@ -667,7 +670,7 @@ describe("AuthCore", () => {
           userService: {
             loadUser: async (email: string) =>
               email === "test@example.com" ? createMockUser(email) : null,
-            createUser: async (profile: any) => createMockUser(profile.email), // Required but won't be called with autoProvision: false
+            createUser: async (profile: any) => createMockUser(profile.email),
           },
           passwordChecker: async (input: string, stored: string) => true,
           logs: false,
@@ -689,13 +692,12 @@ describe("AuthCore", () => {
     test("should handle Google OAuth callback", async () => {
       const response = await request(app)
         .get("/auth/oauth/google/callback?code=mock-code")
-        .redirects(0); // Prevent automatic redirect following
+        .redirects(0);
 
       expect(response.status).toBe(302);
-      // Accept either success or failure redirect (test environment may auto-provision or not)
-      expect(
-        response.header.location
-      ).toMatch(/http:\/\/localhost:3000\/oauth-(success|failure)/);
+      expect(response.header.location).toMatch(
+        /http:\/\/localhost:3000\/oauth-(success|failure)/
+      );
       expect(response.header.location).toContain("provider=google");
     });
 
@@ -735,7 +737,6 @@ describe("AuthCore", () => {
     });
 
     test("should allow access with required permission", async () => {
-      // Mock jwt.verify to return user WITH admin_access
       (jwt.verify as jest.Mock).mockImplementationOnce(
         (token, secret, callback) => {
           const decoded = {
@@ -743,7 +744,7 @@ describe("AuthCore", () => {
             username: "exampleUser",
             email: "test@example.com",
             type: "access",
-            grants: ["read_user", "admin_access"], // Has admin_access
+            grants: ["read_user", "admin_access"],
             exp: Math.floor(Date.now() / 1000) + 3600,
           };
           if (typeof callback === "function") {
@@ -763,7 +764,6 @@ describe("AuthCore", () => {
     });
 
     test("should deny access without required permission", async () => {
-      // Mock jwt.verify to return user WITHOUT admin_access
       (jwt.verify as jest.Mock).mockImplementationOnce(
         (token, secret, callback) => {
           const decoded = {
@@ -771,7 +771,7 @@ describe("AuthCore", () => {
             username: "exampleUser",
             email: "test@example.com",
             type: "access",
-            grants: ["read_user"], // Only read_user, NO admin_access
+            grants: ["read_user"],
             exp: Math.floor(Date.now() / 1000) + 3600,
           };
           if (typeof callback === "function") {

@@ -9,7 +9,6 @@ import { createSessionPayload } from "../utils/session";
 import crypto from "crypto";
 
 // In-memory store for temporary authorization codes
-// In production, use Redis or a database with TTL
 const authCodeStore = new Map<string, { user: User; expiresAt: number }>();
 
 // Cleanup expired codes every 5 minutes
